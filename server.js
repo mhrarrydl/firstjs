@@ -767,18 +767,23 @@ function renderPrintShell(title, body) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
     <style>
+      @page {
+        size: 58mm auto;
+        margin: 0;
+      }
       body {
         font-family: "Helvetica", Arial, sans-serif;
         margin: 0;
+        padding: 0;
       }
       .ticket {
         width: 58mm;
-        padding: 6mm 5mm 8mm 5mm;
+        padding: 0;
         box-sizing: border-box;
       }
       .content {
         width: 48mm;
-        margin-left: 2mm;
+        margin: 0 2mm;
       }
       h1 {
         font-size: 12px;
@@ -801,7 +806,7 @@ function renderPrintShell(title, body) {
         justify-content: space-between;
         gap: 8px;
         margin-bottom: 4px;
-        font-size: 9.5px;
+        font-size: 10.2px;
       }
       .row .label {
         font-weight: 700;
@@ -815,15 +820,15 @@ function renderPrintShell(title, body) {
       }
       .total {
         font-weight: bold;
-        font-size: 11px;
+        font-size: 11.2px;
       }
       .section {
-        font-size: 8.8px;
+        font-size: 9.2px;
         line-height: 1.35;
       }
       .muted {
         color: #000;
-        font-size: 9px;
+        font-size: 9.6px;
         text-align: center;
         font-weight: 700;
       }
