@@ -337,7 +337,8 @@ button:hover,
 }
 
 .search {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr repeat(2, minmax(120px, 1fr)) minmax(140px, 1fr) auto;
   gap: 8px;
   align-items: center;
   padding: 10px 12px;
@@ -352,6 +353,21 @@ button:hover,
   background: transparent;
   outline: none;
   width: 100%;
+}
+
+.search select,
+.search button {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .cards-list {
@@ -505,6 +521,10 @@ button:hover,
 @media (max-width: 960px) {
   .tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .search {
+    grid-template-columns: 1fr;
   }
 
   .form-layout {

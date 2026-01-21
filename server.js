@@ -2,17 +2,22 @@ const express = require("express");
 const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const multer = require("multer");
 const { nanoid } = require("nanoid");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.GADAI_DATA_DIR || path.join(__dirname, "datagadai");
 const DB_FILE = path.join(DATA_DIR, "gadai_db.json");
+const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
+const BACKUP_DIR = path.join(DATA_DIR, "backups");
 
 const FEE_RATE = 0.1;
 
 function ensureDataDir() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
 function loadDb() {
@@ -150,8 +155,90 @@ function buildPrintableData(record) {
   };
 }
 
+function buildCsv(records) {
+  const header = [
+    "id",
+    "nama",
+    "hp",
+    "barang",
+    "gadai",
+    "fee_type",
+    "status",
+    "pawn_date",
+    "tebus_at",
+    "tebus_total",
+  ];
+  const rows = records.map((rec) =>
+    [
+      rec.id,
+      rec.name,
+      rec.phone,
+      rec.item,
+      rec.amount,
+      rec.feeType,
+      rec.status,
+      rec.pawnDate,
+      rec.tebusAt || "",
+      rec.tebusTotal || "",
+    ]
+      .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
+      .join(",")
+  );
+  return [header.join(","), ...rows].join("\n");
+}
+
+function filterRecords(records, query) {
+  const search = (query.q || "").toLowerCase();
+  const min = Number(query.min || 0);
+  const max = Number(query.max || 0);
+  const sort = query.sort || "newest";
+
+  let filtered = records.filter((rec) => {
+    const matchesSearch = !search
+      ? true
+      : `${rec.id} ${rec.name || ""} ${rec.item || ""} ${rec.phone || ""}`.toLowerCase().includes(search);
+    const matchesMin = min ? rec.amount >= min : true;
+    const matchesMax = max ? rec.amount <= max : true;
+    return matchesSearch && matchesMin && matchesMax;
+  });
+
+  filtered = filtered.sort((a, b) => {
+    if (sort === "amountAsc") return a.amount - b.amount;
+    if (sort === "amountDesc") return b.amount - a.amount;
+    if (sort === "oldest") return new Date(a.pawnDate) - new Date(b.pawnDate);
+    return new Date(b.pawnDate) - new Date(a.pawnDate);
+  });
+
+  return filtered;
+}
+
+function getDueSoon(records, now = new Date()) {
+  return records
+    .filter((rec) => rec.status === "aktif")
+    .map((rec) => {
+      const days = diffDays(new Date(rec.pawnDate), now);
+      return { rec, days };
+    })
+    .filter(({ days }) => days >= 14)
+    .sort((a, b) => b.days - a.days)
+    .slice(0, 5);
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, UPLOAD_DIR);
+    },
+    filename: (req, file, cb) => {
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+      cb(null, `${Date.now()}_${safeName}`);
+    },
+  }),
+});
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(UPLOAD_DIR));
 
 app.get("/", (req, res) => {
   res.redirect("/dashboard");
@@ -160,7 +247,8 @@ app.get("/", (req, res) => {
 app.get("/dashboard", (req, res) => {
   const db = loadDb();
   const totals = calcTotals(db.records);
-  res.send(renderLayout("Dashboard", renderDashboard(totals, db.records)));
+  const dueSoon = getDueSoon(db.records);
+  res.send(renderLayout("Dashboard", renderDashboard(totals, db.records, dueSoon)));
 });
 
 app.get("/gadai-baru", (req, res) => {
@@ -168,7 +256,7 @@ app.get("/gadai-baru", (req, res) => {
   res.send(renderLayout("Gadai Baru", renderNewForm(todayValue)));
 });
 
-app.post("/gadai-baru", (req, res) => {
+app.post("/gadai-baru", upload.single("photo"), (req, res) => {
   const db = loadDb();
   const pawnDateInput = parseLocalDate(req.body.pawnDate);
   const pawnDate = pawnDateInput || new Date();
@@ -181,6 +269,7 @@ app.post("/gadai-baru", (req, res) => {
     amount: Number(req.body.amount || 0),
     feeType: req.body.feeType === "depan" ? "depan" : "belakang",
     pawnDate: pawnDate.toISOString(),
+    photo: req.file ? `/uploads/${req.file.filename}` : "",
     status: "aktif",
     events: [
       {
@@ -199,7 +288,10 @@ app.post("/gadai-baru", (req, res) => {
 
 app.get("/aktif", (req, res) => {
   const db = loadDb();
-  const records = db.records.filter((rec) => rec.status === "aktif");
+  const records = filterRecords(
+    db.records.filter((rec) => rec.status === "aktif"),
+    req.query
+  );
   const rows = records.map((record) => ({
     record,
     feeSummary: calcFeeSummary(record),
@@ -219,7 +311,10 @@ app.get("/aktif/:id/bayar-fee", (req, res) => {
 
 app.get("/riwayat", (req, res) => {
   const db = loadDb();
-  const history = db.records.filter((rec) => rec.status !== "aktif");
+  const history = filterRecords(
+    db.records.filter((rec) => rec.status !== "aktif"),
+    req.query
+  );
   res.send(renderLayout("Riwayat", renderHistory(history)));
 });
 
@@ -306,6 +401,26 @@ app.get("/print/fee/:id", (req, res) => {
   res.send(renderPrintFee(buildPrintableData(record), lastFee));
 });
 
+app.get("/export/csv", (req, res) => {
+  const db = loadDb();
+  const csv = buildCsv(db.records);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="gadai_export_${Date.now()}.csv"`);
+  res.send(csv);
+});
+
+app.post("/backup", (req, res) => {
+  ensureDataDir();
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = path.join(BACKUP_DIR, `gadai_db_${stamp}.json`);
+  if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(backupPath, JSON.stringify({ records: [] }, null, 2));
+  } else {
+    fs.copyFileSync(DB_FILE, backupPath);
+  }
+  res.redirect("/dashboard");
+});
+
 function openBrowser(url) {
   const platform = process.platform;
   if (platform === "win32") {
@@ -369,7 +484,7 @@ function renderLayout(title, content) {
 </html>`;
 }
 
-function renderDashboard(totals, records) {
+function renderDashboard(totals, records, dueSoon) {
   const latest = records.slice(0, 5);
   return `
     <section class="stats">
@@ -408,6 +523,46 @@ function renderDashboard(totals, records) {
     </section>
     <section class="panel">
       <div class="panel-header">
+        <h3>Export & Backup</h3>
+      </div>
+      <div class="action-row">
+        <a class="primary" href="/export/csv">Export CSV</a>
+        <form method="post" action="/backup">
+          <button type="submit" class="ghost">Backup Sekarang</button>
+        </form>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-header">
+        <h3>Notifikasi Jatuh Tempo (≥ 2 minggu)</h3>
+      </div>
+      ${
+        dueSoon.length
+          ? `<div class="table modern">
+              <div class="table-row header">
+                <span>ID</span>
+                <span>Nama</span>
+                <span>Barang</span>
+                <span>Hari</span>
+              </div>
+              ${dueSoon
+                .map(
+                  ({ rec, days }) => `
+                <div class="table-row">
+                  <span>${rec.id}</span>
+                  <span>${rec.name || "-"}</span>
+                  <span>${rec.item || "-"}</span>
+                  <span>${days} hari</span>
+                </div>
+              `
+                )
+                .join("")}
+            </div>`
+          : "<p class=\"muted\">Belum ada gadai yang mendekati 3 minggu.</p>"
+      }
+    </section>
+    <section class="panel">
+      <div class="panel-header">
         <h3>Transaksi Terbaru</h3>
       </div>
       <div class="table modern">
@@ -441,7 +596,7 @@ function renderNewForm(todayValue) {
         <div class="panel-header">
           <h3>Gadai Baru</h3>
         </div>
-        <form class="form clean" method="post" action="/gadai-baru" id="gadai-form">
+      <form class="form clean" method="post" action="/gadai-baru" id="gadai-form" enctype="multipart/form-data">
           <div class="form-row">
             <label>
               Nama Pegadai
@@ -452,10 +607,14 @@ function renderNewForm(todayValue) {
               <input type="text" name="phone" placeholder="08xx..." />
             </label>
           </div>
-          <label>
-            Nama Barang
-            <input type="text" name="item" placeholder="Contoh: HP Samsung A54" required />
-          </label>
+        <label>
+          Nama Barang
+          <input type="text" name="item" placeholder="Contoh: HP Samsung A54" required />
+        </label>
+        <label>
+          Foto Barang
+          <input type="file" name="photo" accept="image/*" />
+        </label>
           <div class="form-row">
             <label>
               Nilai Gadai (Rp)
@@ -558,10 +717,19 @@ function renderActiveList(rows) {
         </div>
         <span class="badge">${rows.length} item</span>
       </div>
-      <div class="search">
+      <form class="search" method="get" action="/aktif">
         <span>🔍</span>
-        <input type="text" placeholder="Cari nota, nama, atau barang..." id="search-active" />
-      </div>
+        <input type="text" name="q" placeholder="Cari nota, nama, atau barang..." />
+        <input type="number" name="min" placeholder="Min Rp" />
+        <input type="number" name="max" placeholder="Max Rp" />
+        <select name="sort">
+          <option value="newest">Terbaru</option>
+          <option value="oldest">Terlama</option>
+          <option value="amountAsc">Nominal ↑</option>
+          <option value="amountDesc">Nominal ↓</option>
+        </select>
+        <button type="submit" class="ghost">Filter</button>
+      </form>
       <div class="cards-list">
         ${rows
           .map(({ record, feeSummary }) => {
@@ -583,6 +751,7 @@ function renderActiveList(rows) {
                   <div class="active-meta">
                     <span>👤 ${record.name || "-"}</span>
                     <span>📦 ${record.item || "-"}</span>
+                    ${record.photo ? `<a class="link" href="${record.photo}" target="_blank">📷 Foto</a>` : ""}
                   </div>
                 </div>
                 <div class="active-actions">
@@ -616,19 +785,6 @@ function renderActiveList(rows) {
           })
           .join("")}
       </div>
-      <script>
-        const searchInput = document.getElementById("search-active");
-        const activeCards = Array.from(document.querySelectorAll(".active-card"));
-        if (searchInput) {
-          searchInput.addEventListener("input", (event) => {
-            const query = event.target.value.toLowerCase().trim();
-            activeCards.forEach((card) => {
-              const haystack = card.dataset.search || "";
-              card.style.display = haystack.includes(query) ? "" : "none";
-            });
-          });
-        }
-      </script>
     </section>
   `;
 }
@@ -642,6 +798,19 @@ function renderHistory(records) {
       <div class="panel-header">
         <h3>Riwayat Tebus</h3>
       </div>
+      <form class="search" method="get" action="/riwayat">
+        <span>🔍</span>
+        <input type="text" name="q" placeholder="Cari nota, nama, atau barang..." />
+        <input type="number" name="min" placeholder="Min Rp" />
+        <input type="number" name="max" placeholder="Max Rp" />
+        <select name="sort">
+          <option value="newest">Terbaru</option>
+          <option value="oldest">Terlama</option>
+          <option value="amountAsc">Nominal ↑</option>
+          <option value="amountDesc">Nominal ↓</option>
+        </select>
+        <button type="submit" class="ghost">Filter</button>
+      </form>
       <div class="table modern">
         <div class="table-row header">
           <span>ID</span>

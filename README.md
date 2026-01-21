@@ -30,10 +30,15 @@ atau Anda berada di folder yang salah.
 
 Data disimpan otomatis di folder `datagadai/gadai_db.json`.
 Anda juga bisa mengubah lokasi dengan environment variable `GADAI_DATA_DIR`.
+Folder `datagadai/uploads` menyimpan foto barang yang diunggah, dan `datagadai/backups` menyimpan hasil backup.
 
 ## Fitur Utama
 
 - Dashboard ringkas (aktif, total nilai, tebus, total transaksi).
+- Export CSV & backup data langsung dari dashboard.
+- Filter & sort pada halaman aktif/riwayat.
+- Notifikasi jatuh tempo untuk gadai yang mendekati 3 minggu.
+- Upload foto barang pada form gadai baru.
 - Form gadai baru dengan tanggal otomatis dan input manual.
 - Daftar gadai aktif + aksi **Bayar Fee**, **Tebus**, dan **Print**.
 - Riwayat tebus dengan tombol print.
