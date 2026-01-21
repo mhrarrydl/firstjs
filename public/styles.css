@@ -319,6 +319,16 @@ button.secondary {
   border: 1px solid #e2e8f0;
 }
 
+.ghost.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.ghost.danger:hover {
+  box-shadow: 0 8px 18px rgba(185, 28, 28, 0.2);
+}
+
 button:hover,
 .primary:hover,
 .ghost:hover {
@@ -519,6 +529,49 @@ button:hover,
 .active-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+}
+
+.confirm-panel {
+  display: flex;
+  justify-content: center;
+}
+
+.confirm-card {
+  max-width: 520px;
+  width: 100%;
+  border-radius: 18px;
+  padding: 24px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  text-align: center;
+}
+
+.confirm-card.danger {
+  border: 1px solid #fecaca;
+}
+
+.confirm-details {
+  margin: 16px 0;
+  display: grid;
+  gap: 12px;
+}
+
+.confirm-details .label {
+  color: #64748b;
+  font-size: 12px;
+  margin: 0;
+}
+
+.confirm-details .value {
+  margin: 4px 0 0;
+  font-weight: 700;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .active-header {

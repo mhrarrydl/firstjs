@@ -428,6 +428,9 @@ app.post("/aktif/:id/tebus", (req, res) => {
   if (!record) {
     return res.redirect("/aktif");
   }
+  if (!req.body.confirmed) {
+    return res.send(renderLayout("Konfirmasi Tebus", renderConfirmTebus(record)));
+  }
   const feeSummary = calcFeeSummary(record);
   const tebusTotal = record.amount + feeSummary.feeDue;
 
@@ -442,6 +445,20 @@ app.post("/aktif/:id/tebus", (req, res) => {
     totalPaid: tebusTotal,
   });
 
+  saveDb(db);
+  res.redirect("/riwayat");
+});
+
+app.post("/riwayat/:id/delete", (req, res) => {
+  const db = loadDb();
+  const index = db.records.findIndex((rec) => rec.id === req.params.id);
+  if (index === -1) {
+    return res.redirect("/riwayat");
+  }
+  if (!req.body.confirmed) {
+    return res.send(renderLayout("Konfirmasi Hapus", renderConfirmDelete(db.records[index])));
+  }
+  db.records.splice(index, 1);
   saveDb(db);
   res.redirect("/riwayat");
 });
@@ -912,6 +929,7 @@ function renderHistory(records) {
           <span>Total Tebus</span>
           <span>Tanggal Tebus</span>
           <span>Print</span>
+          <span>Hapus</span>
         </div>
         ${records
           .map(
@@ -926,6 +944,11 @@ function renderHistory(records) {
             <a class="link" href="/print/tebus/${rec.id}?mode=ringkas" target="_blank">Print Ringkas</a>
             <span> | </span>
             <a class="link" href="/print/tebus/${rec.id}?mode=lengkap" target="_blank">Print Lengkap</a>
+          </span>
+          <span>
+            <form method="post" action="/riwayat/${rec.id}/delete">
+              <button type="submit" class="ghost danger">Delete</button>
+            </form>
           </span>
         </div>
       `
@@ -1228,4 +1251,68 @@ function renderPrintFee(data, feeEvent, mode = "ringkas") {
     </div>
   `;
   return renderPrintShell(`Print ${data.id}`, body);
+}
+
+function renderConfirmTebus(record) {
+  return `
+    <section class="panel confirm-panel">
+      <div class="confirm-card">
+        <h3>Konfirmasi Tebus</h3>
+        <p class="muted">Pastikan data benar sebelum memproses tebus.</p>
+        <div class="confirm-details">
+          <div>
+            <p class="label">ID Nota</p>
+            <p class="value">${record.id}</p>
+          </div>
+          <div>
+            <p class="label">Nama</p>
+            <p class="value">${record.name || "-"}</p>
+          </div>
+          <div>
+            <p class="label">Barang</p>
+            <p class="value">${record.item || "-"}</p>
+          </div>
+        </div>
+        <div class="confirm-actions">
+          <a class="ghost" href="/aktif">Batal</a>
+          <form method="post" action="/aktif/${record.id}/tebus">
+            <input type="hidden" name="confirmed" value="true" />
+            <button type="submit" class="primary">Ya, Tebus</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderConfirmDelete(record) {
+  return `
+    <section class="panel confirm-panel">
+      <div class="confirm-card danger">
+        <h3>Hapus Riwayat</h3>
+        <p class="muted">Data tebus akan dihapus permanen.</p>
+        <div class="confirm-details">
+          <div>
+            <p class="label">ID Nota</p>
+            <p class="value">${record.id}</p>
+          </div>
+          <div>
+            <p class="label">Nama</p>
+            <p class="value">${record.name || "-"}</p>
+          </div>
+          <div>
+            <p class="label">Barang</p>
+            <p class="value">${record.item || "-"}</p>
+          </div>
+        </div>
+        <div class="confirm-actions">
+          <a class="ghost" href="/riwayat">Batal</a>
+          <form method="post" action="/riwayat/${record.id}/delete">
+            <input type="hidden" name="confirmed" value="true" />
+            <button type="submit" class="ghost danger">Ya, Hapus</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  `;
 }
