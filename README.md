@@ -11,6 +11,20 @@ npm run gadai
 
 Buka `http://localhost:3000`.
 
+### Windows (jika muncul error ENOENT package.json)
+
+Pastikan Anda menjalankan perintah di folder proyek yang berisi `package.json`.
+
+```bat
+cd C:\path\ke\folder\aplikasi\firstjs
+dir
+npm install
+npm run gadai
+```
+
+Jika file `package.json` tidak ada di folder tersebut, artinya file proyek belum lengkap
+atau Anda berada di folder yang salah.
+
 ## Penyimpanan Data
 
 Data disimpan otomatis di folder `datagadai/gadai_db.json`.
