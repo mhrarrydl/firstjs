@@ -77,6 +77,27 @@ function calcWeeklyFee(amount) {
   return Math.round(Number(amount || 0) * FEE_RATE);
 }
 
+function formatDateId(date) {
+  const dt = new Date(date);
+  const bulan = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+  return `${dt.getDate()} ${bulan[dt.getMonth()]} ${dt.getFullYear()} pukul ${String(dt.getHours()).padStart(2, "0")}.${String(
+    dt.getMinutes()
+  ).padStart(2, "0")}`;
+}
+
 function calcFeeSummary(record, now = new Date()) {
   const pawnDate = new Date(record.pawnDate);
   const days = diffDays(pawnDate, now);
@@ -123,6 +144,7 @@ function buildPrintableData(record) {
     feeType: record.feeType,
     pawnDate: new Date(record.pawnDate),
     status: record.status,
+    tebusAt: record.tebusAt,
     feeSummary,
     totalDue,
   };
@@ -211,6 +233,8 @@ app.post("/aktif/:id/bayar-fee", (req, res) => {
   const feeSummary = calcFeeSummary(record);
   const paidWeeks = Math.min(3, Math.max(1, Number(req.body.paidWeeks || 1)));
   const feePaid = paidWeeks * feeSummary.weeklyFee;
+  const pawnDate = new Date(record.pawnDate);
+  pawnDate.setDate(pawnDate.getDate() + paidWeeks * 7);
   record.events = record.events || [];
   record.events.push({
     type: "bayar-fee",
@@ -219,7 +243,7 @@ app.post("/aktif/:id/bayar-fee", (req, res) => {
     feePaid,
     note: "Fee dibayar untuk memperpanjang masa gadai.",
   });
-  record.pawnDate = new Date().toISOString();
+  record.pawnDate = pawnDate.toISOString();
   record.updatedAt = new Date().toISOString();
 
   saveDb(db);
@@ -256,7 +280,30 @@ app.get("/print/:id", (req, res) => {
   if (!record) {
     return res.status(404).send("Data tidak ditemukan");
   }
-  res.send(renderPrint(buildPrintableData(record)));
+  res.send(renderPrintGadai(buildPrintableData(record)));
+});
+
+app.get("/print/tebus/:id", (req, res) => {
+  const db = loadDb();
+  const record = db.records.find((rec) => rec.id === req.params.id);
+  if (!record) {
+    return res.status(404).send("Data tidak ditemukan");
+  }
+  res.send(renderPrintTebus(buildPrintableData(record)));
+});
+
+app.get("/print/fee/:id", (req, res) => {
+  const db = loadDb();
+  const record = db.records.find((rec) => rec.id === req.params.id);
+  if (!record) {
+    return res.status(404).send("Data tidak ditemukan");
+  }
+  const events = record.events || [];
+  const lastFee = [...events].reverse().find((event) => event.type === "bayar-fee");
+  if (!lastFee) {
+    return res.status(404).send("Belum ada pembayaran fee.");
+  }
+  res.send(renderPrintFee(buildPrintableData(record), lastFee));
 });
 
 function openBrowser(url) {
@@ -613,7 +660,7 @@ function renderHistory(records) {
           <span>${rec.item || "-"}</span>
           <span>${rupiah(rec.tebusTotal || 0)}</span>
           <span>${rec.tebusAt ? new Date(rec.tebusAt).toLocaleDateString("id-ID") : "-"}</span>
-          <span><a class="link" href="/print/${rec.id}" target="_blank">Print</a></span>
+          <span><a class="link" href="/print/tebus/${rec.id}" target="_blank">Print</a></span>
         </div>
       `
           )
@@ -690,6 +737,7 @@ function renderFeePage(record, feeSummary) {
           </div>
           <div class="fee-actions">
             <a class="ghost" href="/aktif">Batal</a>
+            <a class="ghost" href="/print/fee/${record.id}" target="_blank">Print</a>
             <button type="submit" class="primary">Bayar Fee</button>
           </div>
         </form>
@@ -711,13 +759,13 @@ function renderFeePage(record, feeSummary) {
   `;
 }
 
-function renderPrint(data) {
+function renderPrintShell(title, body) {
   return `<!DOCTYPE html>
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Print ${data.id}</title>
+    <title>${title}</title>
     <style>
       body {
         font-family: "Helvetica", Arial, sans-serif;
@@ -728,6 +776,10 @@ function renderPrint(data) {
         padding: 6mm 5mm 8mm 5mm;
         box-sizing: border-box;
       }
+      .content {
+        width: 48mm;
+        margin-left: 2mm;
+      }
       h1 {
         font-size: 12px;
         margin: 0 0 4px;
@@ -735,7 +787,7 @@ function renderPrint(data) {
         font-weight: 700;
       }
       h2 {
-        font-size: 9px;
+        font-size: 9.2px;
         margin: 0 0 8px;
         text-align: center;
         font-weight: 700;
@@ -747,28 +799,33 @@ function renderPrint(data) {
       .row {
         display: flex;
         justify-content: space-between;
+        gap: 8px;
         margin-bottom: 4px;
         font-size: 9.5px;
       }
-      .muted {
-        color: #666;
-        font-size: 8.5px;
-        text-align: center;
+      .row .label {
+        font-weight: 700;
+        flex: 1;
+      }
+      .row .value {
+        font-weight: 700;
+        text-align: right;
+        flex: 1;
+        word-break: break-word;
       }
       .total {
         font-weight: bold;
         font-size: 11px;
       }
-      .label {
-        font-weight: 700;
-      }
-      .value {
-        font-weight: 700;
-      }
       .section {
-        font-size: 8.5px;
-        margin-top: 4px;
-        line-height: 1.3;
+        font-size: 8.8px;
+        line-height: 1.35;
+      }
+      .muted {
+        color: #000;
+        font-size: 9px;
+        text-align: center;
+        font-weight: 700;
       }
       @media print {
         button {
@@ -779,34 +836,111 @@ function renderPrint(data) {
   </head>
   <body>
     <button onclick="window.print()">Print</button>
-    <div class="ticket">
-      <h1>MAHIR CELL</h1>
-      <h2>BUKTI ${data.status === "tebus" ? "TEBUS" : "GADAI"} (58mm)</h2>
-      <div class="rule"></div>
-      <div class="row"><span class="label">ID Nota</span><span class="value">${data.id}</span></div>
-      <div class="row"><span class="label">Tanggal</span><span class="value">${data.pawnDate.toLocaleDateString("id-ID")}</span></div>
-      <div class="rule"></div>
-      <div class="row"><span class="label">Nama</span><span class="value">${(data.name || "-").toUpperCase()}</span></div>
-      <div class="row"><span class="label">No HP</span><span class="value">${data.phone || "-"}</span></div>
-      <div class="rule"></div>
-      <div class="row"><span class="label">Barang</span><span class="value">${(data.item || "-").toUpperCase()}</span></div>
-      <div class="rule"></div>
-      <div class="row"><span class="label">Harga Gadai</span><span class="value">${rupiah(data.amount)}</span></div>
-      <div class="row"><span class="label">Fee</span><span class="value">${rupiah(data.feeSummary.feeDue)}</span></div>
-      <div class="row"><span class="label">Tipe</span><span class="value">${data.feeType === "depan" ? "Depan" : "Belakang"}</span></div>
-      <div class="rule"></div>
-      <div class="row total"><span>Harga Tebus</span><span>${rupiah(data.totalDue)}</span></div>
-      <div class="section">
-        Fee 10% per minggu dari harga gadai. Jika lebih dari 1 minggu, fee bertambah 10% tiap minggu.
-      </div>
-      <div class="rule"></div>
-      <div class="section">
-        1) Barang disimpan baik & tidak digunakan. 2) Tidak ambil komponen sebelum tebus.
-        3) Kerusakan tersembunyi di luar tanggung jawab. 4) Lewat ketentuan = hangus (maksimal 3 minggu).
-        5) Nota wajib dibawa saat tebus. 6) Hub 085136661556 jika ada pertanyaan.
-      </div>
-      <p class="muted">Simpan nota ini baik-baik.</p>
-    </div>
+    ${body}
   </body>
 </html>`;
+}
+
+function renderPrintGadai(data) {
+  const fee = calcWeeklyFee(data.amount);
+  const tebus = data.amount + fee;
+  const uangTerima = data.feeType === "depan" ? Math.max(0, data.amount - fee) : data.amount;
+  const feeInfo = "Fee: 10%/minggu dari harga gadai (bertambah tiap minggu).";
+  const info =
+    "Info:\\n1) Disimpan baik & tidak digunakan.\\n2) Tidak ambil komponen sebelum tebus.\\n3) Kerusakan tersembunyi di luar tanggung jawab.\\n4) Lewat ketentuan = hangus. (maksimal 3 minggu)\\n5) Nota wajib dibawa saat tebus.\\n6) Hub 085136661556 jika ada pertanyaan.";
+  const body = `
+    <div class="ticket">
+      <div class="content">
+        <h1>MAHIR CELL</h1>
+        <h2>BUKTI GADAI (58mm)</h2>
+        <div class="rule"></div>
+        <div class="row"><span class="label">ID Nota</span><span class="value">${data.id}</span></div>
+        <div class="row"><span class="label">Tanggal</span><span class="value">${formatDateId(data.pawnDate)}</span></div>
+        <div class="rule"></div>
+        <div class="row"><span class="label">Nama</span><span class="value">${(data.name || "-").toUpperCase()}</span></div>
+        <div class="row"><span class="label">No HP</span><span class="value">${data.phone || "-"}</span></div>
+        <div class="rule"></div>
+        <div class="row"><span class="label">Barang</span><span class="value">${(data.item || "-").toUpperCase()}</span></div>
+        <div class="rule"></div>
+        <div class="row"><span class="label">Harga Gadai</span><span class="value">${rupiah(data.amount)}</span></div>
+        <div class="row"><span class="label">Fee</span><span class="value">${rupiah(fee)}</span></div>
+        <div class="row"><span class="label">Tipe</span><span class="value">${data.feeType === "depan" ? "Depan" : "Belakang"}</span></div>
+        <div class="rule"></div>
+        <div class="row total"><span class="label">Harga Tebus</span><span class="value">${rupiah(tebus)}</span></div>
+        <div class="row"><span class="label">Uang Diterima</span><span class="value">${rupiah(uangTerima)}</span></div>
+        <div class="rule"></div>
+        <div class="section">${feeInfo}</div>
+        <div class="rule"></div>
+        <div class="section">${info.replaceAll("\\n", "<br />")}</div>
+        <p class="muted">Simpan nota ini baik-baik</p>
+      </div>
+    </div>
+  `;
+  return renderPrintShell(`Print ${data.id}`, body);
+}
+
+function renderPrintTebus(data) {
+  const tebusAt = data.status === "tebus" && data.tebusAt ? new Date(data.tebusAt) : new Date();
+  const pawnDate = new Date(data.pawnDate);
+  const days = diffDays(pawnDate, tebusAt);
+  const weeks = weeksFromDays(days);
+  const weeklyFee = calcWeeklyFee(data.amount);
+  const feeTotal = weeklyFee * weeks;
+  const feePaid = data.feeType === "depan" ? Math.max(0, feeTotal - weeklyFee) : feeTotal;
+  const totalTebus = data.amount + feePaid;
+  const body = `
+    <div class="ticket">
+      <div class="content">
+        <h1>MAHIR CELL</h1>
+        <h2>BUKTI TEBUS (58mm)</h2>
+        <div class="rule"></div>
+        <div class="row"><span class="label">ID Nota</span><span class="value">${data.id}</span></div>
+        <div class="row"><span class="label">Tebus</span><span class="value">${formatDateId(tebusAt)}</span></div>
+        <div class="rule"></div>
+        <div class="row"><span class="label">Nama</span><span class="value">${(data.name || "-").toUpperCase()}</span></div>
+        <div class="row"><span class="label">Barang</span><span class="value">${(data.item || "-").toUpperCase()}</span></div>
+        <div class="rule"></div>
+        <div class="row"><span class="label">Harga Gadai</span><span class="value">${rupiah(data.amount)}</span></div>
+        <div class="row"><span class="label">Tgl Gadai</span><span class="value">${formatDateId(pawnDate)}</span></div>
+        <div class="row"><span class="label">Selisih Hari</span><span class="value">${days}</span></div>
+        <div class="row"><span class="label">Minggu (ceil)</span><span class="value">${weeks}</span></div>
+        <div class="row"><span class="label">Fee/Minggu</span><span class="value">${rupiah(weeklyFee)}</span></div>
+        <div class="row"><span class="label">Fee Total</span><span class="value">${rupiah(feeTotal)}</span></div>
+        <div class="row"><span class="label">Fee Dibayar</span><span class="value">${rupiah(feePaid)}</span></div>
+        <div class="rule"></div>
+        <div class="row total"><span class="label">TOTAL TEBUS</span><span class="value">${rupiah(totalTebus)}</span></div>
+        <div class="rule"></div>
+        <p class="muted">Simpan nota ini baik-baik</p>
+      </div>
+    </div>
+  `;
+  return renderPrintShell(`Print ${data.id}`, body);
+}
+
+function renderPrintFee(data, feeEvent) {
+  const weeks = Number(feeEvent.weeks || 1);
+  const weeklyFee = calcWeeklyFee(data.amount);
+  const feePaid = Number(feeEvent.feePaid || weeks * weeklyFee);
+  const body = `
+    <div class="ticket">
+      <div class="content">
+        <h1>MAHIR CELL</h1>
+        <h2>BUKTI BAYAR FEE (58mm)</h2>
+        <div class="rule"></div>
+        <div class="row"><span class="label">ID Nota</span><span class="value">${data.id}</span></div>
+        <div class="row"><span class="label">Tanggal</span><span class="value">${formatDateId(feeEvent.at)}</span></div>
+        <div class="rule"></div>
+        <div class="row"><span class="label">Nama</span><span class="value">${(data.name || "-").toUpperCase()}</span></div>
+        <div class="row"><span class="label">Barang</span><span class="value">${(data.item || "-").toUpperCase()}</span></div>
+        <div class="rule"></div>
+        <div class="row"><span class="label">Fee/Minggu</span><span class="value">${rupiah(weeklyFee)}</span></div>
+        <div class="row"><span class="label">Minggu Dibayar</span><span class="value">${weeks}</span></div>
+        <div class="row total"><span class="label">Total Bayar</span><span class="value">${rupiah(feePaid)}</span></div>
+        <div class="rule"></div>
+        <div class="section">Fee dibayar untuk memperpanjang masa gadai.</div>
+        <p class="muted">Simpan nota ini baik-baik</p>
+      </div>
+    </div>
+  `;
+  return renderPrintShell(`Print ${data.id}`, body);
 }
