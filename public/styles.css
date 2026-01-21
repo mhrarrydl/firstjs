@@ -564,6 +564,32 @@ button:hover,
   text-align: left;
 }
 
+.detail-photo {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 20px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.detail-photo img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.detail-photo.placeholder {
+  place-items: center;
+  text-align: center;
+}
+
+.detail-photo .placeholder-icon {
+  font-size: 32px;
+}
+
 .confirm-details .label {
   color: #64748b;
   font-size: 12px;

@@ -1272,11 +1272,25 @@ function renderDetailGadai(record, feeSummary) {
   const maxDays = record.feeType === "depan" ? 28 : 21;
   const remainingDays = Math.max(0, maxDays - feeSummary.days);
   const maxLabel = record.feeType === "depan" ? "4 minggu" : "3 minggu";
+  const photoBlock = record.photo
+    ? `
+        <div class="detail-photo">
+          <img src="${record.photo}" alt="Foto barang ${record.item || ""}" />
+          <a class="ghost" href="${record.photo}" download>Save Image</a>
+        </div>
+      `
+    : `
+        <div class="detail-photo placeholder">
+          <div class="placeholder-icon">📷</div>
+          <p class="muted">Belum ada foto barang.</p>
+        </div>
+      `;
   return `
     <section class="panel confirm-panel">
       <div class="confirm-card">
         <h3>Detail Gadai</h3>
         <p class="muted">Informasi lengkap transaksi gadai.</p>
+        ${photoBlock}
         <div class="confirm-details">
           <div>
             <p class="label">ID Nota</p>
