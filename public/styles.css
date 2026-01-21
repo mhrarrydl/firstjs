@@ -556,6 +556,14 @@ button:hover,
   gap: 12px;
 }
 
+.confirm-details > div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+
 .confirm-details .label {
   color: #64748b;
   font-size: 12px;

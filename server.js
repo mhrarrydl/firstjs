@@ -386,6 +386,16 @@ app.get("/aktif/:id/bayar-fee", (req, res) => {
   res.send(renderLayout("Bayar Fee", renderFeePage(record, feeSummary)));
 });
 
+app.get("/aktif/:id", (req, res) => {
+  const db = loadDb();
+  const record = db.records.find((rec) => rec.id === req.params.id);
+  if (!record) {
+    return res.redirect("/aktif");
+  }
+  const feeSummary = calcFeeSummary(record);
+  res.send(renderLayout("Detail Gadai", renderDetailGadai(record, feeSummary)));
+});
+
 app.get("/riwayat", (req, res) => {
   const db = loadDb();
   const history = filterRecords(
@@ -847,6 +857,8 @@ function renderActiveList(rows) {
             });
             const totalDue = record.amount + feeSummary.feeDue;
             const statusClass = dueStatus(feeSummary.days);
+            const maxDays = record.feeType === "depan" ? 28 : 21;
+            const remainingDays = Math.max(0, maxDays - feeSummary.days);
             return `
             <div class="active-card" data-search="${record.id.toLowerCase()} ${(record.name || "").toLowerCase()} ${(record.item || "").toLowerCase()}">
               <div class="active-header">
@@ -856,6 +868,7 @@ function renderActiveList(rows) {
                     <span class="pill aktif">aktif</span>
                     <span class="pill neutral">Fee ${record.feeType === "depan" ? "Depan" : "Belakang"}</span>
                     <span class="pill ${statusClass}">${feeSummary.days} hari</span>
+                    <span class="pill warning">Sisa ${remainingDays} hari</span>
                   </div>
                   <div class="active-meta">
                     <span>👤 ${record.name || "-"}</span>
@@ -864,6 +877,7 @@ function renderActiveList(rows) {
                   </div>
                 </div>
                 <div class="active-actions">
+                  <a class="ghost" href="/aktif/${record.id}">Detail</a>
                   <form method="post" action="/aktif/${record.id}/tebus">
                     <button type="submit" class="secondary">Tebus</button>
                   </form>
@@ -1251,6 +1265,67 @@ function renderPrintFee(data, feeEvent, mode = "ringkas") {
     </div>
   `;
   return renderPrintShell(`Print ${data.id}`, body);
+}
+
+function renderDetailGadai(record, feeSummary) {
+  const pawnDate = formatDateId(record.pawnDate);
+  const maxDays = record.feeType === "depan" ? 28 : 21;
+  const remainingDays = Math.max(0, maxDays - feeSummary.days);
+  const maxLabel = record.feeType === "depan" ? "4 minggu" : "3 minggu";
+  return `
+    <section class="panel confirm-panel">
+      <div class="confirm-card">
+        <h3>Detail Gadai</h3>
+        <p class="muted">Informasi lengkap transaksi gadai.</p>
+        <div class="confirm-details">
+          <div>
+            <p class="label">ID Nota</p>
+            <p class="value">${record.id}</p>
+          </div>
+          <div>
+            <p class="label">Nama</p>
+            <p class="value">${record.name || "-"}</p>
+          </div>
+          <div>
+            <p class="label">Barang</p>
+            <p class="value">${record.item || "-"}</p>
+          </div>
+          <div>
+            <p class="label">No HP</p>
+            <p class="value">${record.phone || "-"}</p>
+          </div>
+          <div>
+            <p class="label">Tanggal Gadai</p>
+            <p class="value">${pawnDate}</p>
+          </div>
+          <div>
+            <p class="label">Harga Gadai</p>
+            <p class="value">${rupiah(record.amount)}</p>
+          </div>
+          <div>
+            <p class="label">Fee/Minggu</p>
+            <p class="value">${rupiah(feeSummary.weeklyFee)}</p>
+          </div>
+          <div>
+            <p class="label">Minggu Berjalan</p>
+            <p class="value">${feeSummary.weeks} minggu (${feeSummary.days} hari)</p>
+          </div>
+          <div>
+            <p class="label">Maksimal</p>
+            <p class="value">${maxLabel}</p>
+          </div>
+          <div>
+            <p class="label">Sisa Hari</p>
+            <p class="value">${remainingDays} hari</p>
+          </div>
+        </div>
+        <div class="confirm-actions">
+          <a class="ghost" href="/aktif">Kembali</a>
+          <a class="ghost" href="/print/${record.id}?mode=lengkap" target="_blank">Print Lengkap</a>
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 function renderConfirmTebus(record) {
