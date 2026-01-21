@@ -11,6 +11,7 @@ const DATA_DIR = process.env.GADAI_DATA_DIR || path.join(__dirname, "datagadai")
 const DB_FILE = path.join(DATA_DIR, "gadai_db.json");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");
+const BACKUP_META = path.join(DATA_DIR, "backup_meta.json");
 
 const FEE_RATE = 0.1;
 
@@ -135,6 +136,81 @@ function calcTotals(records) {
   };
 }
 
+function loadBackupMeta() {
+  ensureDataDir();
+  if (!fs.existsSync(BACKUP_META)) {
+    return { lastBackupDate: "" };
+  }
+  try {
+    const raw = fs.readFileSync(BACKUP_META, "utf-8");
+    return JSON.parse(raw) || { lastBackupDate: "" };
+  } catch (error) {
+    return { lastBackupDate: "" };
+  }
+}
+
+function saveBackupMeta(meta) {
+  ensureDataDir();
+  fs.writeFileSync(BACKUP_META, JSON.stringify(meta, null, 2));
+}
+
+function runBackup() {
+  ensureDataDir();
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = path.join(BACKUP_DIR, `gadai_db_${stamp}.json`);
+  if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(backupPath, JSON.stringify({ records: [] }, null, 2));
+  } else {
+    fs.copyFileSync(DB_FILE, backupPath);
+  }
+  const dateOnly = new Date().toISOString().slice(0, 10);
+  saveBackupMeta({ lastBackupDate: dateOnly });
+}
+
+function scheduleDailyBackup() {
+  const meta = loadBackupMeta();
+  const today = new Date().toISOString().slice(0, 10);
+  if (meta.lastBackupDate !== today) {
+    runBackup();
+  }
+  setInterval(() => {
+    const checkMeta = loadBackupMeta();
+    const nowDate = new Date().toISOString().slice(0, 10);
+    if (checkMeta.lastBackupDate !== nowDate) {
+      runBackup();
+    }
+  }, 60 * 60 * 1000);
+}
+
+function calcDailyReport(records, now = new Date()) {
+  const today = now.toISOString().slice(0, 10);
+  let gadaiMasuk = 0;
+  let tebusMasuk = 0;
+  let feeMasuk = 0;
+
+  records.forEach((rec) => {
+    if (rec.pawnDate && rec.pawnDate.slice(0, 10) === today) {
+      gadaiMasuk += rec.amount || 0;
+    }
+    if (rec.tebusAt && rec.tebusAt.slice(0, 10) === today) {
+      tebusMasuk += rec.tebusTotal || 0;
+    }
+    (rec.events || []).forEach((event) => {
+      if (event.type === "bayar-fee" && event.at && event.at.slice(0, 10) === today) {
+        feeMasuk += event.feePaid || 0;
+      }
+    });
+  });
+
+  return { gadaiMasuk, tebusMasuk, feeMasuk };
+}
+
+function dueStatus(days) {
+  if (days >= 21) return "jatuh";
+  if (days >= 14) return "warning";
+  return "aman";
+}
+
 function buildPrintableData(record) {
   const now = new Date();
   const feeSummary = calcFeeSummary(record, now);
@@ -248,7 +324,8 @@ app.get("/dashboard", (req, res) => {
   const db = loadDb();
   const totals = calcTotals(db.records);
   const dueSoon = getDueSoon(db.records);
-  res.send(renderLayout("Dashboard", renderDashboard(totals, db.records, dueSoon)));
+  const daily = calcDailyReport(db.records);
+  res.send(renderLayout("Dashboard", renderDashboard(totals, db.records, dueSoon, daily)));
 });
 
 app.get("/gadai-baru", (req, res) => {
@@ -375,7 +452,7 @@ app.get("/print/:id", (req, res) => {
   if (!record) {
     return res.status(404).send("Data tidak ditemukan");
   }
-  res.send(renderPrintGadai(buildPrintableData(record)));
+  res.send(renderPrintGadai(buildPrintableData(record), req.query.mode));
 });
 
 app.get("/print/tebus/:id", (req, res) => {
@@ -384,7 +461,7 @@ app.get("/print/tebus/:id", (req, res) => {
   if (!record) {
     return res.status(404).send("Data tidak ditemukan");
   }
-  res.send(renderPrintTebus(buildPrintableData(record)));
+  res.send(renderPrintTebus(buildPrintableData(record), req.query.mode));
 });
 
 app.get("/print/fee/:id", (req, res) => {
@@ -398,7 +475,7 @@ app.get("/print/fee/:id", (req, res) => {
   if (!lastFee) {
     return res.status(404).send("Belum ada pembayaran fee.");
   }
-  res.send(renderPrintFee(buildPrintableData(record), lastFee));
+  res.send(renderPrintFee(buildPrintableData(record), lastFee, req.query.mode));
 });
 
 app.get("/export/csv", (req, res) => {
@@ -410,14 +487,7 @@ app.get("/export/csv", (req, res) => {
 });
 
 app.post("/backup", (req, res) => {
-  ensureDataDir();
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const backupPath = path.join(BACKUP_DIR, `gadai_db_${stamp}.json`);
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(backupPath, JSON.stringify({ records: [] }, null, 2));
-  } else {
-    fs.copyFileSync(DB_FILE, backupPath);
-  }
+  runBackup();
   res.redirect("/dashboard");
 });
 
@@ -436,6 +506,7 @@ function openBrowser(url) {
 
 app.listen(PORT, () => {
   ensureDataDir();
+  scheduleDailyBackup();
   const url = `http://localhost:${PORT}`;
   console.log(`Aplikasi gadai berjalan di ${url}`);
   openBrowser(url);
@@ -484,7 +555,7 @@ function renderLayout(title, content) {
 </html>`;
 }
 
-function renderDashboard(totals, records, dueSoon) {
+function renderDashboard(totals, records, dueSoon, daily) {
   const latest = records.slice(0, 5);
   return `
     <section class="stats">
@@ -523,6 +594,25 @@ function renderDashboard(totals, records, dueSoon) {
     </section>
     <section class="panel">
       <div class="panel-header">
+        <h3>Laporan Harian</h3>
+      </div>
+      <div class="report-grid">
+        <div>
+          <p class="label">Gadai Masuk</p>
+          <p class="value">${rupiah(daily.gadaiMasuk)}</p>
+        </div>
+        <div>
+          <p class="label">Tebus Masuk</p>
+          <p class="value">${rupiah(daily.tebusMasuk)}</p>
+        </div>
+        <div>
+          <p class="label">Fee Masuk</p>
+          <p class="value">${rupiah(daily.feeMasuk)}</p>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-header">
         <h3>Export & Backup</h3>
       </div>
       <div class="action-row">
@@ -552,7 +642,7 @@ function renderDashboard(totals, records, dueSoon) {
                   <span>${rec.id}</span>
                   <span>${rec.name || "-"}</span>
                   <span>${rec.item || "-"}</span>
-                  <span>${days} hari</span>
+                  <span><span class="pill ${dueStatus(days)}">${days} hari</span></span>
                 </div>
               `
                 )
@@ -739,6 +829,7 @@ function renderActiveList(rows) {
               year: "numeric",
             });
             const totalDue = record.amount + feeSummary.feeDue;
+            const statusClass = dueStatus(feeSummary.days);
             return `
             <div class="active-card" data-search="${record.id.toLowerCase()} ${(record.name || "").toLowerCase()} ${(record.item || "").toLowerCase()}">
               <div class="active-header">
@@ -747,6 +838,7 @@ function renderActiveList(rows) {
                     <strong>${record.id}</strong>
                     <span class="pill aktif">aktif</span>
                     <span class="pill neutral">Fee ${record.feeType === "depan" ? "Depan" : "Belakang"}</span>
+                    <span class="pill ${statusClass}">${feeSummary.days} hari</span>
                   </div>
                   <div class="active-meta">
                     <span>👤 ${record.name || "-"}</span>
@@ -759,7 +851,8 @@ function renderActiveList(rows) {
                     <button type="submit" class="secondary">Tebus</button>
                   </form>
                   <a class="ghost" href="/aktif/${record.id}/bayar-fee">Bayar Fee</a>
-                  <a class="ghost" href="/print/${record.id}" target="_blank">Print</a>
+                  <a class="ghost" href="/print/${record.id}?mode=ringkas" target="_blank">Print Ringkas</a>
+                  <a class="ghost" href="/print/${record.id}?mode=lengkap" target="_blank">Print Lengkap</a>
                 </div>
               </div>
               <div class="active-details">
@@ -829,7 +922,11 @@ function renderHistory(records) {
           <span>${rec.item || "-"}</span>
           <span>${rupiah(rec.tebusTotal || 0)}</span>
           <span>${rec.tebusAt ? new Date(rec.tebusAt).toLocaleDateString("id-ID") : "-"}</span>
-          <span><a class="link" href="/print/tebus/${rec.id}" target="_blank">Print</a></span>
+          <span>
+            <a class="link" href="/print/tebus/${rec.id}?mode=ringkas" target="_blank">Print Ringkas</a>
+            <span> | </span>
+            <a class="link" href="/print/tebus/${rec.id}?mode=lengkap" target="_blank">Print Lengkap</a>
+          </span>
         </div>
       `
           )
@@ -906,7 +1003,8 @@ function renderFeePage(record, feeSummary) {
           </div>
           <div class="fee-actions">
             <a class="ghost" href="/aktif">Batal</a>
-            <a class="ghost" href="/print/fee/${record.id}" target="_blank">Print</a>
+            <a class="ghost" href="/print/fee/${record.id}?mode=ringkas" target="_blank">Print Ringkas</a>
+            <a class="ghost" href="/print/fee/${record.id}?mode=lengkap" target="_blank">Print Lengkap</a>
             <button type="submit" class="primary">Bayar Fee</button>
           </div>
         </form>
@@ -1015,13 +1113,17 @@ function renderPrintShell(title, body) {
 </html>`;
 }
 
-function renderPrintGadai(data) {
+function renderPrintGadai(data, mode = "ringkas") {
+  const isFull = mode === "lengkap";
   const fee = calcWeeklyFee(data.amount);
   const tebus = data.amount + fee;
   const uangTerima = data.feeType === "depan" ? Math.max(0, data.amount - fee) : data.amount;
-  const feeInfo = "Fee: 10%/minggu dari harga gadai (bertambah tiap minggu).";
-  const info =
-    "Info:\\n1) Disimpan baik & tidak digunakan.\\n2) Tidak ambil komponen sebelum tebus.\\n3) Kerusakan tersembunyi di luar tanggung jawab.\\n4) Lewat ketentuan = hangus. (maksimal 3 minggu)\\n5) Nota wajib dibawa saat tebus.\\n6) Hub 085136661556 jika ada pertanyaan.";
+  const feeInfo = isFull
+    ? "Penjelasan Fee:\\nFee 10% per minggu dari harga gadai.\\nJika lebih dari 1 minggu, fee bertambah 10% tiap minggu."
+    : "Fee: 10%/minggu dari harga gadai (bertambah tiap minggu).";
+  const info = isFull
+    ? "Informasi Penting:\\n1. Barang disimpan baik dan tidak digunakan.\\n2. Tidak ambil komponen sebelum tebus.\\n3. Kerusakan tersembunyi di luar tanggung jawab.\\n4. Tidak ditebus sesuai ketentuan = hangus (maksimal 3 minggu).\\n5. Nota wajib dibawa saat tebus.\\n6. Hub 085136661556 jika ada pertanyaan."
+    : "Info:\\n1) Disimpan baik & tidak digunakan.\\n2) Tidak ambil komponen sebelum tebus.\\n3) Kerusakan tersembunyi di luar tanggung jawab.\\n4) Lewat ketentuan = hangus. (maksimal 3 minggu)\\n5) Nota wajib dibawa saat tebus.\\n6) Hub 085136661556 jika ada pertanyaan.";
   const body = `
     <div class="ticket">
       <div class="content">
@@ -1043,7 +1145,7 @@ function renderPrintGadai(data) {
         <div class="row total"><span class="label">Harga Tebus</span><span class="value">${rupiah(tebus)}</span></div>
         <div class="row"><span class="label">Uang Diterima</span><span class="value">${rupiah(uangTerima)}</span></div>
         <div class="rule"></div>
-        <div class="section">${feeInfo}</div>
+        <div class="section">${feeInfo.replaceAll("\\n", "<br />")}</div>
         <div class="rule"></div>
         <div class="section">${info.replaceAll("\\n", "<br />")}</div>
         <p class="muted">Simpan nota ini baik-baik</p>
@@ -1053,7 +1155,8 @@ function renderPrintGadai(data) {
   return renderPrintShell(`Print ${data.id}`, body);
 }
 
-function renderPrintTebus(data) {
+function renderPrintTebus(data, mode = "ringkas") {
+  const isFull = mode === "lengkap";
   const tebusAt = data.status === "tebus" && data.tebusAt ? new Date(data.tebusAt) : new Date();
   const pawnDate = new Date(data.pawnDate);
   const days = diffDays(pawnDate, tebusAt);
@@ -1062,6 +1165,9 @@ function renderPrintTebus(data) {
   const feeTotal = weeklyFee * weeks;
   const feePaid = data.feeType === "depan" ? Math.max(0, feeTotal - weeklyFee) : feeTotal;
   const totalTebus = data.amount + feePaid;
+  const info = isFull
+    ? "Informasi Penting:\\nNota ini adalah bukti tebus resmi. Simpan baik-baik untuk arsip."
+    : "Info: Simpan nota ini baik-baik.";
   const body = `
     <div class="ticket">
       <div class="content">
@@ -1084,6 +1190,7 @@ function renderPrintTebus(data) {
         <div class="rule"></div>
         <div class="row total"><span class="label">TOTAL TEBUS</span><span class="value">${rupiah(totalTebus)}</span></div>
         <div class="rule"></div>
+        <div class="section">${info.replaceAll("\\n", "<br />")}</div>
         <p class="muted">Simpan nota ini baik-baik</p>
       </div>
     </div>
@@ -1091,10 +1198,14 @@ function renderPrintTebus(data) {
   return renderPrintShell(`Print ${data.id}`, body);
 }
 
-function renderPrintFee(data, feeEvent) {
+function renderPrintFee(data, feeEvent, mode = "ringkas") {
+  const isFull = mode === "lengkap";
   const weeks = Number(feeEvent.weeks || 1);
   const weeklyFee = calcWeeklyFee(data.amount);
   const feePaid = Number(feeEvent.feePaid || weeks * weeklyFee);
+  const info = isFull
+    ? "Fee dibayar untuk memperpanjang masa gadai. Simpan nota ini sebagai bukti pembayaran."
+    : "Fee dibayar untuk memperpanjang masa gadai.";
   const body = `
     <div class="ticket">
       <div class="content">
@@ -1111,7 +1222,7 @@ function renderPrintFee(data, feeEvent) {
         <div class="row"><span class="label">Minggu Dibayar</span><span class="value">${weeks}</span></div>
         <div class="row total"><span class="label">Total Bayar</span><span class="value">${rupiah(feePaid)}</span></div>
         <div class="rule"></div>
-        <div class="section">Fee dibayar untuk memperpanjang masa gadai.</div>
+        <div class="section">${info}</div>
         <p class="muted">Simpan nota ini baik-baik</p>
       </div>
     </div>

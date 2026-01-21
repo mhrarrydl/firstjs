@@ -35,6 +35,10 @@ Folder `datagadai/uploads` menyimpan foto barang yang diunggah, dan `datagadai/b
 ## Fitur Utama
 
 - Dashboard ringkas (aktif, total nilai, tebus, total transaksi).
+- Backup otomatis harian saat server berjalan + tombol backup manual.
+- Laporan harian (gadai masuk, tebus masuk, fee masuk).
+- Status jatuh tempo berwarna (aman/peringatan/jatuh tempo).
+- Template print ringkas/lengkap.
 - Export CSV & backup data langsung dari dashboard.
 - Filter & sort pada halaman aktif/riwayat.
 - Notifikasi jatuh tempo untuk gadai yang mendekati 3 minggu.
