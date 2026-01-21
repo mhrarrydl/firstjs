@@ -1,4 +1,5 @@
 const express = require("express");
+const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { nanoid } = require("nanoid");
@@ -246,9 +247,24 @@ app.get("/print/:id", (req, res) => {
   res.send(renderPrint(buildPrintableData(record)));
 });
 
+function openBrowser(url) {
+  const platform = process.platform;
+  if (platform === "win32") {
+    exec(`start "" "${url}"`);
+    return;
+  }
+  if (platform === "darwin") {
+    exec(`open "${url}"`);
+    return;
+  }
+  exec(`xdg-open "${url}"`);
+}
+
 app.listen(PORT, () => {
   ensureDataDir();
-  console.log(`Aplikasi gadai berjalan di http://localhost:${PORT}`);
+  const url = `http://localhost:${PORT}`;
+  console.log(`Aplikasi gadai berjalan di ${url}`);
+  openBrowser(url);
 });
 
 function renderLayout(title, content) {

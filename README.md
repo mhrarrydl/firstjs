@@ -10,6 +10,7 @@ npm run gadai
 ```
 
 Buka `http://localhost:3000`.
+Server akan otomatis membuka browser saat berjalan, dan akan terus aktif sampai Anda menutupnya (Ctrl+C).
 
 ### Windows (jika muncul error ENOENT package.json)
 
