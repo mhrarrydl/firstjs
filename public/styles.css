@@ -86,6 +86,12 @@ body {
   padding: 24px 32px 48px;
 }
 
+.form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 20px;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -160,6 +166,28 @@ body {
 
 .panel-form {
   max-width: 600px;
+}
+
+.summary-panel {
+  align-self: flex-start;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.summary-item strong {
+  font-size: 15px;
+}
+
+.summary-item.highlight {
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed #cbd5f5;
 }
 
 .panel-header {
@@ -331,6 +359,86 @@ button:hover,
   gap: 16px;
 }
 
+.fee-panel {
+  max-width: 720px;
+}
+
+.fee-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.fee-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.fee-id {
+  margin: 0;
+  font-weight: 700;
+}
+
+.fee-meta {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.fee-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  background: #fff;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.fee-form {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.fee-options {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fee-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.fee-option input {
+  margin: 0;
+}
+
+.fee-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.fee-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 .active-card {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
@@ -397,6 +505,10 @@ button:hover,
 @media (max-width: 960px) {
   .tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-layout {
+    grid-template-columns: 1fr;
   }
 
   .panel-form {

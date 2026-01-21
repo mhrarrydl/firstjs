@@ -185,6 +185,16 @@ app.get("/aktif", (req, res) => {
   res.send(renderLayout("Gadai Aktif", renderActiveList(rows)));
 });
 
+app.get("/aktif/:id/bayar-fee", (req, res) => {
+  const db = loadDb();
+  const record = db.records.find((rec) => rec.id === req.params.id);
+  if (!record) {
+    return res.redirect("/aktif");
+  }
+  const feeSummary = calcFeeSummary(record);
+  res.send(renderLayout("Bayar Fee", renderFeePage(record, feeSummary)));
+});
+
 app.get("/riwayat", (req, res) => {
   const db = loadDb();
   const history = db.records.filter((rec) => rec.status !== "aktif");
@@ -199,13 +209,15 @@ app.post("/aktif/:id/bayar-fee", (req, res) => {
   }
 
   const feeSummary = calcFeeSummary(record);
+  const paidWeeks = Math.min(3, Math.max(1, Number(req.body.paidWeeks || 1)));
+  const feePaid = paidWeeks * feeSummary.weeklyFee;
   record.events = record.events || [];
   record.events.push({
     type: "bayar-fee",
     at: new Date().toISOString(),
-    weeks: feeSummary.weeks,
-    feePaid: feeSummary.feeDue,
-    note: "Fee dibayar, tanggal gadai direset.",
+    weeks: paidWeeks,
+    feePaid,
+    note: "Fee dibayar untuk memperpanjang masa gadai.",
   });
   record.pawnDate = new Date().toISOString();
   record.updatedAt = new Date().toISOString();
@@ -295,7 +307,7 @@ function renderLayout(title, content) {
         <a class="${title === "Gadai Baru" ? "active" : ""}" href="/gadai-baru">
           <span class="tab-icon">＋</span> Gadai Baru
         </a>
-        <a class="${title === "Gadai Aktif" ? "active" : ""}" href="/aktif">
+        <a class="${title === "Gadai Aktif" || title === "Bayar Fee" ? "active" : ""}" href="/aktif">
           <span class="tab-icon">◼</span> Aktif
         </a>
         <a class="${title === "Riwayat" ? "active" : ""}" href="/riwayat">
@@ -377,46 +389,112 @@ function renderDashboard(totals, records) {
 
 function renderNewForm(todayValue) {
   return `
-    <section class="panel panel-form">
-      <div class="panel-header">
-        <h3>Gadai Baru</h3>
+    <section class="form-layout">
+      <div class="panel panel-form">
+        <div class="panel-header">
+          <h3>Gadai Baru</h3>
+        </div>
+        <form class="form clean" method="post" action="/gadai-baru" id="gadai-form">
+          <div class="form-row">
+            <label>
+              Nama Pegadai
+              <input type="text" name="name" placeholder="Masukkan nama..." required />
+            </label>
+            <label>
+              No. HP (opsional)
+              <input type="text" name="phone" placeholder="08xx..." />
+            </label>
+          </div>
+          <label>
+            Nama Barang
+            <input type="text" name="item" placeholder="Contoh: HP Samsung A54" required />
+          </label>
+          <div class="form-row">
+            <label>
+              Nilai Gadai (Rp)
+              <input type="number" name="amount" min="0" step="1000" value="0" required id="gadai-amount" />
+            </label>
+            <label>
+              Tanggal Gadai
+              <input type="date" name="pawnDate" value="${todayValue}" id="gadai-date" />
+              <small>Biarkan otomatis jika kosong.</small>
+            </label>
+          </div>
+          <label>
+            Pembayaran Fee
+            <select name="feeType" id="gadai-fee-type">
+              <option value="belakang">Bayar di Belakang</option>
+              <option value="depan">Bayar di Depan</option>
+            </select>
+          </label>
+          <button class="primary" type="submit">Simpan Gadai</button>
+        </form>
       </div>
-      <form class="form clean" method="post" action="/gadai-baru">
-        <div class="form-row">
-          <label>
-            Nama Pegadai
-            <input type="text" name="name" placeholder="Masukkan nama..." required />
-          </label>
-          <label>
-            No. HP (opsional)
-            <input type="text" name="phone" placeholder="08xx..." />
-          </label>
+      <aside class="panel summary-panel">
+        <div class="panel-header">
+          <h3>Ringkasan Gadai</h3>
         </div>
-        <label>
-          Nama Barang
-          <input type="text" name="item" placeholder="Contoh: HP Samsung A54" required />
-        </label>
-        <div class="form-row">
-          <label>
-            Nilai Gadai (Rp)
-            <input type="number" name="amount" min="0" step="1000" value="0" required />
-          </label>
-          <label>
-            Tanggal Gadai
-            <input type="date" name="pawnDate" value="${todayValue}" />
-            <small>Biarkan otomatis jika kosong.</small>
-          </label>
+        <div class="summary-item">
+          <span>Nilai Gadai</span>
+          <strong id="summary-amount">Rp 0</strong>
         </div>
-        <label>
-          Pembayaran Fee
-          <select name="feeType">
-            <option value="belakang">Bayar di Belakang</option>
-            <option value="depan">Bayar di Depan</option>
-          </select>
-        </label>
-        <button class="primary" type="submit">Simpan Gadai</button>
-      </form>
+        <div class="summary-item">
+          <span>Fee per Minggu (10%)</span>
+          <strong id="summary-fee">Rp 0</strong>
+        </div>
+        <div class="summary-item">
+          <span>Tebus (Bayar Depan)</span>
+          <strong id="summary-tebus-depan">Rp 0</strong>
+        </div>
+        <div class="summary-item">
+          <span>Tebus (Bayar Belakang)</span>
+          <strong id="summary-tebus-belakang">Rp 0</strong>
+        </div>
+        <div class="summary-item highlight">
+          <span>Maksimal Tebus (3 minggu)</span>
+          <strong id="summary-max-date">-</strong>
+        </div>
+        <p class="muted">Tanggal maksimal dihitung 3 minggu dari tanggal gadai.</p>
+      </aside>
     </section>
+    <script>
+      const amountInput = document.getElementById("gadai-amount");
+      const dateInput = document.getElementById("gadai-date");
+      const feeTypeSelect = document.getElementById("gadai-fee-type");
+      const summaryAmount = document.getElementById("summary-amount");
+      const summaryFee = document.getElementById("summary-fee");
+      const summaryTebusDepan = document.getElementById("summary-tebus-depan");
+      const summaryTebusBelakang = document.getElementById("summary-tebus-belakang");
+      const summaryMaxDate = document.getElementById("summary-max-date");
+
+      const rupiah = (value) =>
+        new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(
+          Number(value || 0)
+        );
+
+      function updateSummary() {
+        const amount = Number(amountInput.value || 0);
+        const fee = Math.round(amount * 0.1);
+        summaryAmount.textContent = rupiah(amount);
+        summaryFee.textContent = rupiah(fee);
+        summaryTebusDepan.textContent = rupiah(amount);
+        summaryTebusBelakang.textContent = rupiah(amount + fee);
+
+        const dateValue = dateInput.value;
+        if (dateValue) {
+          const dt = new Date(dateValue);
+          dt.setDate(dt.getDate() + 21);
+          summaryMaxDate.textContent = dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+        } else {
+          summaryMaxDate.textContent = "-";
+        }
+      }
+
+      amountInput.addEventListener("input", updateSummary);
+      dateInput.addEventListener("change", updateSummary);
+      feeTypeSelect.addEventListener("change", updateSummary);
+      updateSummary();
+    </script>
   `;
 }
 
@@ -435,7 +513,7 @@ function renderActiveList(rows) {
       </div>
       <div class="search">
         <span>🔍</span>
-        <input type="text" placeholder="Cari nota, nama, atau barang..." disabled />
+        <input type="text" placeholder="Cari nota, nama, atau barang..." id="search-active" />
       </div>
       <div class="cards-list">
         ${rows
@@ -447,7 +525,7 @@ function renderActiveList(rows) {
             });
             const totalDue = record.amount + feeSummary.feeDue;
             return `
-            <div class="active-card">
+            <div class="active-card" data-search="${record.id.toLowerCase()} ${(record.name || "").toLowerCase()} ${(record.item || "").toLowerCase()}">
               <div class="active-header">
                 <div>
                   <div class="active-id">
@@ -464,9 +542,7 @@ function renderActiveList(rows) {
                   <form method="post" action="/aktif/${record.id}/tebus">
                     <button type="submit" class="secondary">Tebus</button>
                   </form>
-                  <form method="post" action="/aktif/${record.id}/bayar-fee">
-                    <button type="submit">Bayar Fee</button>
-                  </form>
+                  <a class="ghost" href="/aktif/${record.id}/bayar-fee">Bayar Fee</a>
                   <a class="ghost" href="/print/${record.id}" target="_blank">Print</a>
                 </div>
               </div>
@@ -493,6 +569,19 @@ function renderActiveList(rows) {
           })
           .join("")}
       </div>
+      <script>
+        const searchInput = document.getElementById("search-active");
+        const activeCards = Array.from(document.querySelectorAll(".active-card"));
+        if (searchInput) {
+          searchInput.addEventListener("input", (event) => {
+            const query = event.target.value.toLowerCase().trim();
+            activeCards.forEach((card) => {
+              const haystack = card.dataset.search || "";
+              card.style.display = haystack.includes(query) ? "" : "none";
+            });
+          });
+        }
+      </script>
     </section>
   `;
 }
@@ -531,6 +620,94 @@ function renderHistory(records) {
           .join("")}
       </div>
     </section>
+  `;
+}
+
+function renderFeePage(record, feeSummary) {
+  const pawnDate = new Date(record.pawnDate).toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  return `
+    <section class="panel fee-panel">
+      <div class="panel-header">
+        <div>
+          <h3>Bayar Fee Perpanjangan</h3>
+          <p class="muted">Bayar fee untuk memperpanjang masa gadai.</p>
+        </div>
+      </div>
+      <div class="fee-card">
+        <div class="fee-header">
+          <div>
+            <p class="fee-id">${record.id}</p>
+            <p class="fee-meta">👤 ${record.name || "-"} · 📦 ${record.item || "-"}</p>
+            <p class="fee-meta">📅 ${pawnDate}</p>
+          </div>
+          <span class="pill neutral">Fee ${record.feeType === "depan" ? "Depan" : "Belakang"}</span>
+        </div>
+        <div class="fee-grid">
+          <div>
+            <p class="label">Nilai Gadai</p>
+            <p class="value">${rupiah(record.amount)}</p>
+          </div>
+          <div>
+            <p class="label">Max Minggu</p>
+            <p class="value">3 minggu</p>
+          </div>
+          <div>
+            <p class="label">Minggu Saat Ini</p>
+            <p class="value">${feeSummary.weeks} minggu</p>
+          </div>
+          <div>
+            <p class="label">Fee/Minggu</p>
+            <p class="value">${rupiah(feeSummary.weeklyFee)}</p>
+          </div>
+        </div>
+        <form method="post" action="/aktif/${record.id}/bayar-fee" class="fee-form">
+          <label>Pilih Jumlah Minggu</label>
+          <div class="fee-options">
+            ${[1, 2, 3]
+              .map(
+                (week) => `
+              <label class="fee-option">
+                <input type="radio" name="paidWeeks" value="${week}" ${week === 1 ? "checked" : ""} />
+                <span>${week}</span>
+              </label>
+            `
+              )
+              .join("")}
+          </div>
+          <div class="fee-summary">
+            <div>
+              <p class="label">Fee per Minggu (10%)</p>
+              <p class="value">${rupiah(feeSummary.weeklyFee)}</p>
+            </div>
+            <div>
+              <p class="label">Total Bayar</p>
+              <p class="value" id="fee-total">${rupiah(feeSummary.weeklyFee)}</p>
+            </div>
+          </div>
+          <div class="fee-actions">
+            <a class="ghost" href="/aktif">Batal</a>
+            <button type="submit" class="primary">Bayar Fee</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    <script>
+      const feeRadios = document.querySelectorAll('input[name="paidWeeks"]');
+      const feeTotal = document.getElementById("fee-total");
+      const weeklyFee = ${feeSummary.weeklyFee};
+      feeRadios.forEach((radio) => {
+        radio.addEventListener("change", (event) => {
+          const weeks = Number(event.target.value || 1);
+          feeTotal.textContent = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(
+            weeks * weeklyFee
+          );
+        });
+      });
+    </script>
   `;
 }
 
