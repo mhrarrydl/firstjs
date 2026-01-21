@@ -1272,6 +1272,7 @@ function renderDetailGadai(record, feeSummary) {
   const maxDays = record.feeType === "depan" ? 28 : 21;
   const remainingDays = Math.max(0, maxDays - feeSummary.days);
   const maxLabel = record.feeType === "depan" ? "4 minggu" : "3 minggu";
+  const safeId = record.id.replace(/[^a-zA-Z0-9_-]/g, "");
   const photoBlock = record.photo
     ? `
         <div class="detail-photo">
@@ -1287,7 +1288,7 @@ function renderDetailGadai(record, feeSummary) {
       `;
   return `
     <section class="panel confirm-panel">
-      <div class="confirm-card">
+      <div class="confirm-card" id="detail-card">
         <h3>Detail Gadai</h3>
         <p class="muted">Informasi lengkap transaksi gadai.</p>
         ${photoBlock}
@@ -1335,10 +1336,25 @@ function renderDetailGadai(record, feeSummary) {
         </div>
         <div class="confirm-actions">
           <a class="ghost" href="/aktif">Kembali</a>
+          <button type="button" class="ghost" id="save-detail-image">Save Detail JPG</button>
           <a class="ghost" href="/print/${record.id}?mode=lengkap" target="_blank">Print Lengkap</a>
         </div>
       </div>
     </section>
+    <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+      const saveButton = document.getElementById("save-detail-image");
+      const detailCard = document.getElementById("detail-card");
+      if (saveButton && detailCard) {
+        saveButton.addEventListener("click", async () => {
+          const canvas = await html2canvas(detailCard, { scale: 2, backgroundColor: "#ffffff" });
+          const link = document.createElement("a");
+          link.download = "detail_${safeId || "gadai"}.jpg";
+          link.href = canvas.toDataURL("image/jpeg", 0.92);
+          link.click();
+        });
+      }
+    </script>
   `;
 }
 
