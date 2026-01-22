@@ -360,7 +360,7 @@ app.post("/gadai-baru", upload.single("photo"), (req, res) => {
   db.records.unshift(record);
   saveDb(db);
 
-  res.redirect("/aktif");
+  res.redirect(`/print/${record.id}?autoprint=1`);
 });
 
 app.get("/aktif", (req, res) => {
@@ -456,7 +456,7 @@ app.post("/aktif/:id/tebus", (req, res) => {
   });
 
   saveDb(db);
-  res.redirect("/riwayat");
+  res.redirect(`/print/tebus/${record.id}?autoprint=1`);
 });
 
 app.post("/riwayat/:id/delete", (req, res) => {
@@ -558,7 +558,6 @@ function renderLayout(title, content) {
             <p>Sistem Manajemen Gadai</p>
           </div>
         </div>
-        <button class="ghost">Install App</button>
       </header>
       <nav class="tabs">
         <a class="${title === "Dashboard" ? "active" : ""}" href="/dashboard">
@@ -882,8 +881,7 @@ function renderActiveList(rows) {
                     <button type="submit" class="secondary">Tebus</button>
                   </form>
                   <a class="ghost" href="/aktif/${record.id}/bayar-fee">Bayar Fee</a>
-                  <a class="ghost" href="/print/${record.id}?mode=ringkas" target="_blank">Print Ringkas</a>
-                  <a class="ghost" href="/print/${record.id}?mode=lengkap" target="_blank">Print Lengkap</a>
+                  <a class="ghost" href="/print/${record.id}" target="_blank">Print</a>
                 </div>
               </div>
               <div class="active-details">
@@ -955,9 +953,7 @@ function renderHistory(records) {
           <span>${rupiah(rec.tebusTotal || 0)}</span>
           <span>${rec.tebusAt ? new Date(rec.tebusAt).toLocaleDateString("id-ID") : "-"}</span>
           <span>
-            <a class="link" href="/print/tebus/${rec.id}?mode=ringkas" target="_blank">Print Ringkas</a>
-            <span> | </span>
-            <a class="link" href="/print/tebus/${rec.id}?mode=lengkap" target="_blank">Print Lengkap</a>
+            <a class="link" href="/print/tebus/${rec.id}" target="_blank">Print</a>
           </span>
           <span>
             <form method="post" action="/riwayat/${rec.id}/delete">
@@ -1038,13 +1034,12 @@ function renderFeePage(record, feeSummary) {
               <p class="value" id="fee-total">${rupiah(feeSummary.weeklyFee)}</p>
             </div>
           </div>
-          <div class="fee-actions">
-            <a class="ghost" href="/aktif">Batal</a>
-            <a class="ghost" href="/print/fee/${record.id}?mode=ringkas" target="_blank">Print Ringkas</a>
-            <a class="ghost" href="/print/fee/${record.id}?mode=lengkap" target="_blank">Print Lengkap</a>
-            <button type="submit" class="primary">Bayar Fee</button>
-          </div>
-        </form>
+        <div class="fee-actions">
+          <a class="ghost" href="/aktif">Batal</a>
+          <a class="ghost" href="/print/fee/${record.id}" target="_blank">Print</a>
+          <button type="submit" class="primary">Bayar Fee</button>
+        </div>
+      </form>
       </div>
     </section>
     <script>
@@ -1146,11 +1141,19 @@ function renderPrintShell(title, body) {
   <body>
     <button onclick="window.print()">Print</button>
     ${body}
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("autoprint") === "1") {
+        window.addEventListener("load", () => {
+          window.print();
+        });
+      }
+    </script>
   </body>
 </html>`;
 }
 
-function renderPrintGadai(data, mode = "ringkas") {
+function renderPrintGadai(data, mode = "lengkap") {
   const isFull = mode === "lengkap";
   const fee = calcWeeklyFee(data.amount);
   const tebus = data.amount + fee;
@@ -1192,7 +1195,7 @@ function renderPrintGadai(data, mode = "ringkas") {
   return renderPrintShell(`Print ${data.id}`, body);
 }
 
-function renderPrintTebus(data, mode = "ringkas") {
+function renderPrintTebus(data, mode = "lengkap") {
   const isFull = mode === "lengkap";
   const tebusAt = data.status === "tebus" && data.tebusAt ? new Date(data.tebusAt) : new Date();
   const pawnDate = new Date(data.pawnDate);
@@ -1235,7 +1238,7 @@ function renderPrintTebus(data, mode = "ringkas") {
   return renderPrintShell(`Print ${data.id}`, body);
 }
 
-function renderPrintFee(data, feeEvent, mode = "ringkas") {
+function renderPrintFee(data, feeEvent, mode = "lengkap") {
   const isFull = mode === "lengkap";
   const weeks = Number(feeEvent.weeks || 1);
   const weeklyFee = calcWeeklyFee(data.amount);
@@ -1337,7 +1340,7 @@ function renderDetailGadai(record, feeSummary) {
         <div class="confirm-actions">
           <a class="ghost" href="/aktif">Kembali</a>
           <button type="button" class="ghost" id="save-detail-image">Save Detail JPG</button>
-          <a class="ghost" href="/print/${record.id}?mode=lengkap" target="_blank">Print Lengkap</a>
+          <a class="ghost" href="/print/${record.id}" target="_blank">Print</a>
         </div>
       </div>
     </section>
