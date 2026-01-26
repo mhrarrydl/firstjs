@@ -44,5 +44,6 @@ Folder `datagadai/uploads` menyimpan foto barang yang diunggah, dan `datagadai/b
 - Notifikasi jatuh tempo untuk gadai yang mendekati 3 minggu.
 - Upload foto barang pada form gadai baru.
 - Form gadai baru dengan tanggal otomatis dan input manual.
+- Data identitas tambahan (alamat & NIK) untuk pencatatan.
 - Daftar gadai aktif + aksi **Bayar Fee**, **Tebus**, dan **Print**.
 - Riwayat tebus dengan tombol print.

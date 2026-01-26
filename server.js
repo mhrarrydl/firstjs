@@ -236,6 +236,8 @@ function buildCsv(records) {
     "id",
     "nama",
     "hp",
+    "alamat",
+    "nik",
     "barang",
     "gadai",
     "fee_type",
@@ -249,6 +251,8 @@ function buildCsv(records) {
       rec.id,
       rec.name,
       rec.phone,
+      rec.address || "",
+      rec.nik || "",
       rec.item,
       rec.amount,
       rec.feeType,
@@ -272,7 +276,9 @@ function filterRecords(records, query) {
   let filtered = records.filter((rec) => {
     const matchesSearch = !search
       ? true
-      : `${rec.id} ${rec.name || ""} ${rec.item || ""} ${rec.phone || ""}`.toLowerCase().includes(search);
+      : `${rec.id} ${rec.name || ""} ${rec.item || ""} ${rec.phone || ""} ${rec.nik || ""} ${rec.address || ""}`
+          .toLowerCase()
+          .includes(search);
     const matchesMin = min ? rec.amount >= min : true;
     const matchesMax = max ? rec.amount <= max : true;
     return matchesSearch && matchesMin && matchesMax;
@@ -342,6 +348,8 @@ app.post("/gadai-baru", upload.single("photo"), (req, res) => {
     id: `MC${nanoid(8).toUpperCase()}`,
     name: (req.body.name || "").trim(),
     phone: (req.body.phone || "").trim(),
+    address: (req.body.address || "").trim(),
+    nik: (req.body.nik || "").trim(),
     item: (req.body.item || "").trim(),
     amount: Number(req.body.amount || 0),
     feeType: req.body.feeType === "depan" ? "depan" : "belakang",
@@ -360,7 +368,7 @@ app.post("/gadai-baru", upload.single("photo"), (req, res) => {
   db.records.unshift(record);
   saveDb(db);
 
-  res.redirect(`/print/${record.id}?autoprint=1`);
+  res.redirect("/aktif");
 });
 
 app.get("/aktif", (req, res) => {
@@ -384,6 +392,42 @@ app.get("/aktif/:id/bayar-fee", (req, res) => {
   }
   const feeSummary = calcFeeSummary(record);
   res.send(renderLayout("Bayar Fee", renderFeePage(record, feeSummary)));
+});
+
+app.get("/aktif/:id/edit", (req, res) => {
+  const db = loadDb();
+  const record = db.records.find((rec) => rec.id === req.params.id);
+  if (!record) {
+    return res.redirect("/aktif");
+  }
+  res.send(renderLayout("Edit Gadai", renderEditGadai(record)));
+});
+
+app.post("/aktif/:id/edit", upload.single("photo"), (req, res) => {
+  const db = loadDb();
+  const record = db.records.find((rec) => rec.id === req.params.id);
+  if (!record) {
+    return res.redirect("/aktif");
+  }
+  record.name = (req.body.name || "").trim();
+  record.phone = (req.body.phone || "").trim();
+  record.address = (req.body.address || "").trim();
+  record.nik = (req.body.nik || "").trim();
+  record.item = (req.body.item || "").trim();
+  record.amount = Number(req.body.amount || 0);
+  record.feeType = req.body.feeType === "depan" ? "depan" : "belakang";
+  if (req.body.pawnDate) {
+    const pawnDateInput = parseLocalDate(req.body.pawnDate);
+    if (pawnDateInput) {
+      record.pawnDate = pawnDateInput.toISOString();
+    }
+  }
+  if (req.file) {
+    record.photo = `/uploads/${req.file.filename}`;
+  }
+  record.updatedAt = new Date().toISOString();
+  saveDb(db);
+  res.redirect("/aktif");
 });
 
 app.get("/aktif/:id", (req, res) => {
@@ -713,16 +757,26 @@ function renderNewForm(todayValue) {
           <h3>Gadai Baru</h3>
         </div>
       <form class="form clean" method="post" action="/gadai-baru" id="gadai-form" enctype="multipart/form-data">
-          <div class="form-row">
-            <label>
-              Nama Pegadai
-              <input type="text" name="name" placeholder="Masukkan nama..." required />
-            </label>
-            <label>
-              No. HP (opsional)
-              <input type="text" name="phone" placeholder="08xx..." />
-            </label>
-          </div>
+        <div class="form-row">
+          <label>
+            Nama Pegadai
+            <input type="text" name="name" placeholder="Masukkan nama..." required />
+          </label>
+          <label>
+            No. HP (opsional)
+            <input type="text" name="phone" placeholder="08xx..." />
+          </label>
+        </div>
+        <div class="form-row">
+          <label>
+            Alamat
+            <input type="text" name="address" placeholder="Alamat lengkap..." />
+          </label>
+          <label>
+            NIK
+            <input type="text" name="nik" placeholder="Nomor KTP" />
+          </label>
+        </div>
         <label>
           Nama Barang
           <input type="text" name="item" placeholder="Contoh: HP Samsung A54" required />
@@ -773,10 +827,10 @@ function renderNewForm(todayValue) {
           <strong id="summary-tebus-belakang">Rp 0</strong>
         </div>
         <div class="summary-item highlight">
-          <span>Maksimal Tebus (3 minggu)</span>
+          <span>Maksimal Tebus</span>
           <strong id="summary-max-date">-</strong>
         </div>
-        <p class="muted">Tanggal maksimal dihitung 3 minggu dari tanggal gadai.</p>
+        <p class="muted">Tanggal maksimal mengikuti tipe fee (3 atau 4 minggu).</p>
       </aside>
     </section>
     <script>
@@ -804,8 +858,9 @@ function renderNewForm(todayValue) {
 
         const dateValue = dateInput.value;
         if (dateValue) {
+          const maxDays = feeTypeSelect.value === "depan" ? 28 : 21;
           const dt = new Date(dateValue);
-          dt.setDate(dt.getDate() + 21);
+          dt.setDate(dt.getDate() + maxDays);
           summaryMaxDate.textContent = dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
         } else {
           summaryMaxDate.textContent = "-";
@@ -877,6 +932,7 @@ function renderActiveList(rows) {
                 </div>
                 <div class="active-actions">
                   <a class="ghost" href="/aktif/${record.id}">Detail</a>
+                  <a class="ghost" href="/aktif/${record.id}/edit">Edit</a>
                   <form method="post" action="/aktif/${record.id}/tebus">
                     <button type="submit" class="secondary">Tebus</button>
                   </form>
@@ -1313,6 +1369,14 @@ function renderDetailGadai(record, feeSummary) {
             <p class="value">${record.phone || "-"}</p>
           </div>
           <div>
+            <p class="label">Alamat</p>
+            <p class="value">${record.address || "-"}</p>
+          </div>
+          <div>
+            <p class="label">NIK</p>
+            <p class="value">${record.nik || "-"}</p>
+          </div>
+          <div>
             <p class="label">Tanggal Gadai</p>
             <p class="value">${pawnDate}</p>
           </div>
@@ -1358,6 +1422,71 @@ function renderDetailGadai(record, feeSummary) {
         });
       }
     </script>
+  `;
+}
+
+function renderEditGadai(record) {
+  const pawnDateValue = toDateInputValue(new Date(record.pawnDate));
+  const photoPreview = record.photo
+    ? `<div class="detail-photo"><img src="${record.photo}" alt="Foto barang ${record.item || ""}" /></div>`
+    : "";
+  return `
+    <section class="panel confirm-panel">
+      <div class="confirm-card">
+        <h3>Edit Gadai</h3>
+        <p class="muted">Perbarui data gadai jika diperlukan.</p>
+        ${photoPreview}
+        <form class="form clean" method="post" action="/aktif/${record.id}/edit" enctype="multipart/form-data">
+          <div class="form-row">
+            <label>
+              Nama Pegadai
+              <input type="text" name="name" value="${record.name || ""}" required />
+            </label>
+            <label>
+              No. HP
+              <input type="text" name="phone" value="${record.phone || ""}" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              Alamat
+              <input type="text" name="address" value="${record.address || ""}" />
+            </label>
+            <label>
+              NIK
+              <input type="text" name="nik" value="${record.nik || ""}" />
+            </label>
+          </div>
+          <label>
+            Nama Barang
+            <input type="text" name="item" value="${record.item || ""}" required />
+          </label>
+          <label>
+            Nilai Gadai (Rp)
+            <input type="number" name="amount" min="0" step="1000" value="${record.amount || 0}" required />
+          </label>
+          <label>
+            Tanggal Gadai
+            <input type="date" name="pawnDate" value="${pawnDateValue}" />
+          </label>
+          <label>
+            Pembayaran Fee
+            <select name="feeType">
+              <option value="belakang" ${record.feeType === "belakang" ? "selected" : ""}>Bayar di Belakang</option>
+              <option value="depan" ${record.feeType === "depan" ? "selected" : ""}>Bayar di Depan</option>
+            </select>
+          </label>
+          <label>
+            Foto Barang (opsional)
+            <input type="file" name="photo" accept="image/*" />
+          </label>
+          <div class="confirm-actions">
+            <a class="ghost" href="/aktif">Batal</a>
+            <button type="submit" class="primary">Simpan Perubahan</button>
+          </div>
+        </form>
+      </div>
+    </section>
   `;
 }
 
