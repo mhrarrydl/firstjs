@@ -1212,7 +1212,7 @@ function renderPrintShell(title, body) {
 function renderPrintGadai(data, mode = "lengkap") {
   const isFull = mode === "lengkap";
   const fee = calcWeeklyFee(data.amount);
-  const tebus = data.amount + fee;
+  const tebus = data.feeType === "depan" ? data.amount : data.amount + fee;
   const uangTerima = data.feeType === "depan" ? Math.max(0, data.amount - fee) : data.amount;
   const feeInfo = isFull
     ? "Penjelasan Fee:\\nFee 10% per minggu dari harga gadai.\\nJika lebih dari 1 minggu, fee bertambah 10% tiap minggu."
