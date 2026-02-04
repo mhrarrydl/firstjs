@@ -54,7 +54,7 @@ body {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   background: rgba(241, 245, 249, 0.8);
   padding: 14px 32px;

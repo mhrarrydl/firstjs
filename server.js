@@ -449,6 +449,12 @@ app.get("/riwayat", (req, res) => {
   res.send(renderLayout("Riwayat", renderHistory(history)));
 });
 
+app.get("/fee", (req, res) => {
+  const db = loadDb();
+  const feeHistory = buildFeeHistory(db.records);
+  res.send(renderLayout("Pembayaran Fee", renderFeeHistory(feeHistory)));
+});
+
 app.post("/aktif/:id/bayar-fee", (req, res) => {
   const db = loadDb();
   const record = db.records.find((rec) => rec.id === req.params.id);
@@ -612,6 +618,9 @@ function renderLayout(title, content) {
         </a>
         <a class="${title === "Gadai Aktif" || title === "Bayar Fee" ? "active" : ""}" href="/aktif">
           <span class="tab-icon">◼</span> Aktif
+        </a>
+        <a class="${title === "Pembayaran Fee" ? "active" : ""}" href="/fee">
+          <span class="tab-icon">₿</span> Pembayaran Fee
         </a>
         <a class="${title === "Riwayat" ? "active" : ""}" href="/riwayat">
           <span class="tab-icon">↺</span> Riwayat
@@ -1114,6 +1123,62 @@ function renderFeePage(record, feeSummary) {
   `;
 }
 
+function buildFeeHistory(records) {
+  const list = [];
+  records.forEach((rec) => {
+    (rec.events || []).forEach((event) => {
+      if (event.type === "bayar-fee") {
+        list.push({
+          id: rec.id,
+          name: rec.name,
+          item: rec.item,
+          feePaid: event.feePaid,
+          weeks: event.weeks,
+          at: event.at,
+        });
+      }
+    });
+  });
+  return list.sort((a, b) => new Date(b.at) - new Date(a.at));
+}
+
+function renderFeeHistory(entries) {
+  if (!entries.length) {
+    return `<section class="panel"><p>Belum ada pembayaran fee.</p></section>`;
+  }
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <h3>Riwayat Pembayaran Fee</h3>
+      </div>
+      <div class="table modern">
+        <div class="table-row header">
+          <span>ID</span>
+          <span>Nama</span>
+          <span>Barang</span>
+          <span>Minggu</span>
+          <span>Total Bayar</span>
+          <span>Tanggal</span>
+        </div>
+        ${entries
+          .map(
+            (entry) => `
+        <div class="table-row">
+          <span>${entry.id}</span>
+          <span>${entry.name || "-"}</span>
+          <span>${entry.item || "-"}</span>
+          <span>${entry.weeks} minggu</span>
+          <span>${rupiah(entry.feePaid)}</span>
+          <span>${entry.at ? new Date(entry.at).toLocaleDateString("id-ID") : "-"}</span>
+        </div>
+      `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderPrintShell(title, body) {
   return `<!DOCTYPE html>
 <html lang="id">
@@ -1532,8 +1597,7 @@ function renderAutoPrint(id) {
   </head>
   <body>
     <script>
-      window.open("/print/${id}?autoprint=1", "_blank");
-      window.location.href = "/aktif";
+      window.location.href = "/print/${id}?autoprint=1";
     </script>
   </body>
 </html>`;
