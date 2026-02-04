@@ -1,0 +1,15 @@
+{
+  "name": "gadai-app",
+  "version": "1.0.0",
+  "description": "Aplikasi gadai sederhana berbasis Node.js",
+  "main": "server.js",
+  "scripts": {
+    "gadai": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^5.0.7"
+  }
+}
