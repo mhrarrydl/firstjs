@@ -1,0 +1,270 @@
+{
+  "masterData": {
+    "products": [
+      {
+        "id": 1,
+        "code": "P001",
+        "name": "Kain Katun Premium",
+        "categoryId": 1,
+        "supplierId": 1,
+        "stock": 150,
+        "buyPrice": 60000,
+        "sellPrice": 85000
+      },
+      {
+        "id": 2,
+        "code": "P002",
+        "name": "Kain Denim Stretch",
+        "categoryId": 1,
+        "supplierId": 2,
+        "stock": 80,
+        "buyPrice": 90000,
+        "sellPrice": 120000
+      },
+      {
+        "id": 3,
+        "code": "P003",
+        "name": "Celana Chino Slim",
+        "categoryId": 2,
+        "supplierId": 3,
+        "stock": 45,
+        "buyPrice": 140000,
+        "sellPrice": 189000
+      }
+    ],
+    "categories": [
+      {
+        "id": 1,
+        "code": "C001",
+        "name": "Kain",
+        "description": "Bahan kain mentah untuk produksi"
+      },
+      {
+        "id": 2,
+        "code": "C002",
+        "name": "Celana",
+        "description": "Produk celana jadi siap jual"
+      }
+    ],
+    "suppliers": [
+      {
+        "id": 1,
+        "code": "S001",
+        "name": "PT Tekstil Jaya",
+        "phone": "081234567890",
+        "city": "Bandung"
+      },
+      {
+        "id": 2,
+        "code": "S002",
+        "name": "CV Denim Indo",
+        "phone": "081298765432",
+        "city": "Surabaya"
+      },
+      {
+        "id": 3,
+        "code": "S003",
+        "name": "PT Asia Fabric",
+        "phone": "082112345678",
+        "city": "Jakarta"
+      }
+    ],
+    "accounts": [
+      {
+        "id": 1,
+        "code": "A001",
+        "name": "Kas",
+        "type": "Aset",
+        "balance": 45000000
+      },
+      {
+        "id": 2,
+        "code": "A002",
+        "name": "Modal",
+        "type": "Ekuitas",
+        "balance": 100000000
+      },
+      {
+        "id": 3,
+        "code": "A003",
+        "name": "Persediaan Barang",
+        "type": "Aset",
+        "balance": 32000000
+      },
+      {
+        "id": 4,
+        "code": "A004",
+        "name": "Beban Operasional",
+        "type": "Beban",
+        "balance": 0
+      }
+    ],
+    "users": [
+      {
+        "id": 1,
+        "username": "admin",
+        "role": "admin",
+        "name": "Admin Veracollection"
+      }
+    ]
+  },
+  "transactions": {
+    "sales": [
+      {
+        "id": 1,
+        "date": "2025-09-10",
+        "productId": 1,
+        "product": "Kain Katun Premium",
+        "qty": 335,
+        "price": 85000,
+        "total": 28475000
+      },
+      {
+        "id": 2,
+        "date": "2025-10-10",
+        "productId": 2,
+        "product": "Kain Denim Stretch",
+        "qty": 267,
+        "price": 120000,
+        "total": 32040000
+      },
+      {
+        "id": 3,
+        "date": "2025-11-10",
+        "productId": 3,
+        "product": "Celana Chino Slim",
+        "qty": 158,
+        "price": 189000,
+        "total": 29862000
+      },
+      {
+        "id": 4,
+        "date": "2025-12-10",
+        "productId": 1,
+        "product": "Kain Katun Premium",
+        "qty": 419,
+        "price": 85000,
+        "total": 35615000
+      },
+      {
+        "id": 5,
+        "date": "2026-01-10",
+        "productId": 3,
+        "product": "Celana Chino Slim",
+        "qty": 202,
+        "price": 189000,
+        "total": 38178000
+      },
+      {
+        "id": 6,
+        "date": "2026-02-10",
+        "productId": 2,
+        "product": "Kain Denim Stretch",
+        "qty": 346,
+        "price": 120000,
+        "total": 41520000
+      }
+    ],
+    "purchases": [
+      {
+        "id": 1,
+        "date": "2025-09-05",
+        "item": "Pembelian Kain Katun",
+        "qty": 200,
+        "price": 60000,
+        "total": 12000000
+      },
+      {
+        "id": 2,
+        "date": "2025-10-05",
+        "item": "Pembelian Kain Denim",
+        "qty": 161,
+        "price": 90000,
+        "total": 14490000
+      },
+      {
+        "id": 3,
+        "date": "2025-11-05",
+        "item": "Pembelian Kain Twill",
+        "qty": 140,
+        "price": 80000,
+        "total": 11200000
+      },
+      {
+        "id": 4,
+        "date": "2025-12-05",
+        "item": "Pembelian Kain Linen",
+        "qty": 180,
+        "price": 88000,
+        "total": 15840000
+      },
+      {
+        "id": 5,
+        "date": "2026-01-05",
+        "item": "Pembelian Kain Drill",
+        "qty": 180,
+        "price": 90000,
+        "total": 16200000
+      },
+      {
+        "id": 6,
+        "date": "2026-02-05",
+        "item": "Pembelian Kain Premium",
+        "qty": 250,
+        "price": 70000,
+        "total": 17500000
+      }
+    ],
+    "expenses": [
+      {
+        "id": 1,
+        "date": "2025-09-20",
+        "type": "Gaji",
+        "note": "Gaji karyawan",
+        "amount": 7200000
+      },
+      {
+        "id": 2,
+        "date": "2025-09-25",
+        "type": "Operasional",
+        "note": "Listrik & transport",
+        "amount": 4000000
+      },
+      {
+        "id": 3,
+        "date": "2025-10-25",
+        "type": "Operasional",
+        "note": "Listrik & transport",
+        "amount": 10800000
+      },
+      {
+        "id": 4,
+        "date": "2025-11-25",
+        "type": "Operasional",
+        "note": "Listrik & transport",
+        "amount": 12100000
+      },
+      {
+        "id": 5,
+        "date": "2025-12-25",
+        "type": "Operasional",
+        "note": "Listrik & transport",
+        "amount": 11500000
+      },
+      {
+        "id": 6,
+        "date": "2026-01-25",
+        "type": "Operasional",
+        "note": "Listrik & transport",
+        "amount": 12800000
+      },
+      {
+        "id": 7,
+        "date": "2026-02-25",
+        "type": "Operasional",
+        "note": "Listrik & transport",
+        "amount": 13200000
+      }
+    ]
+  }
+}

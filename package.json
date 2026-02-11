@@ -1,0 +1,17 @@
+{
+  "name": "firstjs-finance-system",
+  "version": "1.0.0",
+  "description": "Sistem keuangan UMKM berbasis JSON dengan modul master data, transaksi, laporan, dan analisis kesehatan usaha.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "finance",
+    "json",
+    "umkm",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "MIT"
+}

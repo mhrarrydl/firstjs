@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Veracollection Insight</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>Vera<span>collection</span></h1>
+          <p>Sistem Informasi Keuangan</p>
+        </div>
+        <div class="menu-block">
+          <h3>Menu Utama</h3>
+          <button class="menu-btn" data-route="dashboard">Dashboard</button>
+        </div>
+        <div class="menu-block">
+          <h3>Master Data</h3>
+          <button class="menu-btn" data-route="produk">Produk</button>
+          <button class="menu-btn" data-route="kategori">Kategori</button>
+          <button class="menu-btn" data-route="supplier">Supplier</button>
+          <button class="menu-btn" data-route="akun">Akun Keuangan</button>
+        </div>
+        <div class="menu-block">
+          <h3>Transaksi</h3>
+          <button class="menu-btn" data-route="penjualan">Penjualan</button>
+          <button class="menu-btn" data-route="pembelian">Pembelian</button>
+          <button class="menu-btn" data-route="pengeluaran">Pengeluaran</button>
+        </div>
+        <div class="menu-block">
+          <h3>Laporan</h3>
+          <button class="menu-btn" data-route="laba-rugi">Laba Rugi</button>
+          <button class="menu-btn" data-route="arus-kas">Arus Kas</button>
+          <button class="menu-btn" data-route="rekap-bulanan">Rekap Bulanan</button>
+        </div>
+        <div class="menu-block">
+          <h3>Analisis</h3>
+          <button class="menu-btn" data-route="analisis">Kesehatan Usaha</button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar"><span id="adminName">Admin Veracollection</span></header>
+
+        <section class="view" data-view="dashboard">
+          <h2>Dashboard</h2>
+          <p class="sub">Ringkasan keuangan Veracollection bulan ini</p>
+          <div class="kpi-grid">
+            <article class="card kpi"><h4>Total Penjualan</h4><p id="kpiSales">Rp 0</p></article>
+            <article class="card kpi"><h4>Laba Bersih</h4><p id="kpiProfit">Rp 0</p></article>
+            <article class="card kpi"><h4>Total Pengeluaran</h4><p id="kpiCost">Rp 0</p></article>
+            <article class="card kpi"><h4>Kesehatan Usaha</h4><p id="kpiHealth">-</p></article>
+          </div>
+          <div class="grid-2">
+            <article class="card"><h3>Tren Pendapatan & Laba</h3><canvas id="trendChart" height="120"></canvas></article>
+            <article class="card"><h3>Arus Kas</h3><canvas id="cashChart" height="120"></canvas></article>
+          </div>
+        </section>
+
+        <section class="view" data-view="produk">
+          <div class="section-head"><div><h2>Produk</h2><p class="sub">Kelola data produk kain & celana</p></div><button id="addProduct" class="primary">+ Tambah Produk</button></div>
+          <article class="card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nama</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Supplier</th><th>Aksi</th></tr></thead><tbody id="productsTable"></tbody></table></div></article>
+        </section>
+
+        <section class="view" data-view="kategori">
+          <div class="section-head"><div><h2>Kategori Produk</h2><p class="sub">Kelola kategori produk</p></div><button id="addCategory" class="primary">+ Tambah Kategori</button></div>
+          <div id="categoriesGrid" class="card-grid"></div>
+        </section>
+
+        <section class="view" data-view="supplier">
+          <div class="section-head"><div><h2>Supplier</h2><p class="sub">Kelola data supplier</p></div><button id="addSupplier" class="primary">+ Tambah Supplier</button></div>
+          <div id="suppliersGrid" class="card-grid"></div>
+        </section>
+
+        <section class="view" data-view="akun">
+          <div class="section-head"><div><h2>Akun Keuangan</h2><p class="sub">Kas, modal, beban, dan akun lainnya</p></div><button id="addAccount" class="primary">+ Tambah Akun</button></div>
+          <article class="card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nama</th><th>Tipe</th><th>Saldo</th><th>Aksi</th></tr></thead><tbody id="accountsTable"></tbody></table></div></article>
+        </section>
+
+        <section class="view" data-view="penjualan">
+          <div class="section-head"><div><h2>Penjualan</h2><p class="sub">Catat transaksi penjualan</p></div><button id="addSale" class="primary">+ Tambah Penjualan</button></div>
+          <article class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Produk</th><th>Qty</th><th>Harga</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="salesTable"></tbody></table></div></article>
+        </section>
+
+        <section class="view" data-view="pembelian">
+          <div class="section-head"><div><h2>Pembelian</h2><p class="sub">Catat pembelian kain, barang, operasional</p></div><button id="addPurchase" class="primary">+ Tambah Pembelian</button></div>
+          <article class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Item</th><th>Qty</th><th>Harga</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="purchasesTable"></tbody></table></div></article>
+        </section>
+
+        <section class="view" data-view="pengeluaran">
+          <div class="section-head"><div><h2>Pengeluaran</h2><p class="sub">Gaji, listrik, transport, dll.</p></div><button id="addExpense" class="primary">+ Tambah Pengeluaran</button></div>
+          <article class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Keterangan</th><th>Nominal</th><th>Aksi</th></tr></thead><tbody id="expensesTable"></tbody></table></div></article>
+        </section>
+
+        <section class="view" data-view="laba-rugi">
+          <h2>Laporan Laba Rugi</h2><p class="sub">Ringkasan laba rugi otomatis</p>
+          <article class="card report-box" id="profitLossBox"></article>
+        </section>
+
+        <section class="view" data-view="arus-kas">
+          <h2>Laporan Arus Kas</h2><p class="sub">Kas masuk dan kas keluar</p>
+          <article class="card"><canvas id="cashDetailChart" height="110"></canvas></article>
+        </section>
+
+        <section class="view" data-view="rekap-bulanan">
+          <h2>Rekapitulasi Bulanan</h2><p class="sub">Pendapatan, biaya, dan laba per bulan</p>
+          <article class="card"><div class="table-wrap"><table><thead><tr><th>Bulan</th><th>Penjualan</th><th>Pembelian</th><th>Pengeluaran</th><th>Laba</th></tr></thead><tbody id="monthlyTable"></tbody></table></div></article>
+          <article class="card"><canvas id="monthlyChart" height="110"></canvas></article>
+        </section>
+
+        <section class="view" data-view="analisis">
+          <h2>Analisis Kesehatan Usaha</h2><p class="sub">Indikator kesehatan bisnis</p>
+          <article class="card health-box"><h3 id="healthStatus">-</h3><p id="healthDesc"></p></article>
+          <div class="grid-3">
+            <article class="card"><h4>Profit Margin</h4><p id="metricMargin">0%</p></article>
+            <article class="card"><h4>Perputaran Persediaan</h4><p id="metricInventory">0x</p></article>
+            <article class="card"><h4>Asset Turnover</h4><p id="metricAsset">0x</p></article>
+          </div>
+        </section>
+
+        <section class="view" data-view="data-json">
+          <h2>Database JSON</h2>
+          <article class="card"><pre id="rawDb"></pre></article>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="jsonDialog">
+      <form method="dialog" id="jsonForm">
+        <h3 id="dialogTitle"></h3>
+        <textarea id="dialogPayload" required></textarea>
+        <menu>
+          <button value="cancel">Batal</button>
+          <button class="primary" value="submit">Simpan</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
